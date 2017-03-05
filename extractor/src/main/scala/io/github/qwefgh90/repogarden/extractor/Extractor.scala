@@ -73,8 +73,8 @@ object Extractor {
 
     uri.getScheme() match {
       case `fileScheme` => {
-        val path = Paths.get(uri.getSchemeSpecificPart.substring(1)) //take a file part
-        val is = new FileInputStream(path.toFile)
+        val file = new File(uri) //take a file part. A file object avoids error of leading slash
+        val is = new FileInputStream(file)
         autoClose(is){is =>
           val result = extractComments(is, JSearch.getContentType(tempFile, fileName))
           result.map{
@@ -116,7 +116,24 @@ object Extractor {
       case PY_TYPE => { 
         parsePyType(stream)
       }
+      case C_TYPE => {
+        parseCType(stream)
+      }
+      case C_HEADER_TYPE => {
+        parseCType(stream)
+      }
+      case CPP_TYPE => {
+        parseCType(stream)
+      }
+      case CPP_HEADER_TYPE => {
+        parseCType(stream)
+      }
+      case SCALA_TYPE => {
+        parseCType(stream)
+      }
+      case RUBY_TYPE => {
+        parseRubyType(stream)
+      }
     }
   }
-
 }

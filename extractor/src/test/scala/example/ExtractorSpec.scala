@@ -34,7 +34,7 @@ class ExtractorSpec extends FlatSpec with Matchers {
     input.toByte
   }
 
-  "Results of java extractor" should "be equal to 5th, 6th comment" in {
+  "Results of extracting java.java" should "be equal to 5th, 6th comment" in {
     val javaUri = getClass.getResource("/java.java").toURI
     val javaList = extractComments(javaUri, "java.java").get
     (javaList(5) shouldEqual """*
@@ -46,7 +46,7 @@ class ExtractorSpec extends FlatSpec with Matchers {
     (javaList(6) should equal (""" load from property file""")) (after being ignoreSpecialChars)
   }
 
-  "Results of py extractor" should "be equal to a part of 5th comment, 6th" in {
+  "Results of extracting py.py" should "be equal to a part of 5th comment, 6th" in {
     val pyUri = getClass.getResource("/py.py").toURI
     val pyList = extractComments(pyUri, "py.py").get
     (pyList(5) should startWith ("""
@@ -61,6 +61,32 @@ usage:"""))
     (pyList(6).toString should equal (""" Attempt to enable urllib3's SNI support, if possible""")) (after being ignoreSpecialChars)
   }
 
+  "Results of extracting c.c" should "be equal to 14th, 15th comment" in {
+    val cUri = getClass.getResource("/c.c").toURI
+    val cList = extractComments(cUri, "c.c").get
+    (cList(13) shouldEqual """ Rotate the list removing the tail node and inserting it to the head. """) (after being ignoreSpecialChars)
+    (cList(16) should equal (""" Test a EOF Comment""")) (after being ignoreSpecialChars)
+  }
+  "Results of extracting h.h" should "be equal to 2th, 3th comment" in {
+    val hUri = getClass.getResource("/h.h").toURI
+    val hList = extractComments(hUri, "h.h").get
+    (hList(1) shouldEqual """This comment is for test """) (after being ignoreSpecialChars)
+    (hList(2) should equal (""" Node, List, and Iterator are the only data structures used currently.""")) (after being ignoreSpecialChars)
+  }
+
+  "Results of extracting scala.scala" should "be equal to 1th, 3th comment" in {
+    val scalaUri = getClass.getResource("/scala.scala").toURI
+    val hList = extractComments(scalaUri, "scala.scala").get
+    (hList(0) shouldEqual """* * Copyright (C) 2009-2017 Lightbend Inc. <http://www.lightbend.com> """) (after being ignoreSpecialChars)
+    (hList(12) should equal ("""look at you""")) (after being ignoreSpecialChars)
+  }
+
+  "Results of extracting rb.rb" should "be equal to 1th, 2th comment" in {
+    val rbUri = getClass.getResource("/rb.rb").toURI
+    val rbList = extractComments(rbUri, "rb.rb").get
+    (rbList(0) shouldEqual """ Returns the version of the currently loaded Rails as a <tt>Gem::Version</tt> """) (after being ignoreSpecialChars)
+    (rbList(1) should equal ("""can you see it? mutiline comment""")) (after being ignoreSpecialChars)
+  }
 
   "Parser" should "return a count of comments we excect" in {
     val javaStream = getClass.getResourceAsStream("/java.java")
@@ -74,6 +100,31 @@ usage:"""))
     pyList should not be None
     pyList.get.size shouldEqual 11
     pyStream.close()
+
+    val cStream = getClass.getResourceAsStream("/c.c")
+    val cList = parseCType(cStream)
+    cList should not be None
+    cList.get.size shouldEqual 17
+    cStream.close()
+    
+    val hStream = getClass.getResourceAsStream("/h.h")
+    val hList = parseCType(hStream)
+    hList should not be None
+    hList.get.size shouldEqual 7
+    hStream.close()
+
+    val scalaStream = getClass.getResourceAsStream("/scala.scala")
+    val scalaList = parseScalaType(scalaStream)
+    scalaList should not be None
+    scalaList.get.size shouldEqual 13
+    scalaStream.close()
+
+    val rubyStream = getClass.getResourceAsStream("/rb.rb")
+    val rubyList = parseRubyType(rubyStream)
+    rubyList should not be None
+    rubyList.get.size shouldEqual 2
+    rubyStream.close()
+
   }
 
   "URI Scheme" should "http or file" in {
