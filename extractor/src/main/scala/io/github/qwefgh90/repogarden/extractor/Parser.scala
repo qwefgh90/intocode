@@ -25,6 +25,10 @@ object Parser{
     new WrapperArrayByffer(array)
   }
 
+  /**
+    * @constructor create new wrapper for finding sequence
+    * @param array an array to be wrapped
+    */
   class WrapperArrayByffer(array: ArrayBuffer[Byte]){
     def findFromLast(ch: Char, allowFrontBackslash: Boolean):Boolean = {
       findFromLast(ch.toString, allowFrontBackslash)
@@ -416,6 +420,146 @@ def parseRubyType(stream: InputStream): Option[List[Array[Byte]]] = {
         }
       }
     }
+    }
+    Option(listBuffer.toList)
+  }
+
+def parseGoType(stream: InputStream): Option[List[Array[Byte]]] = 
+  {
+    //https://golang.org/ref/spec#Comments
+    val listBuffer = new ListBuffer[Array[Byte]]()
+    val lexicalBuf = new ArrayBuffer[Byte]()
+    val NOP = -1
+    val START_TRANDITIONAL_COMMENT = 0
+    val START_EOL_COMMENT = 1
+    val START_STRING = 2
+    val START_RAW_STRING = 3
+
+    var state: Int = NOP
+    var currentByte = stream.read() //read a first byte
+    while(currentByte != -1){
+      //FSM
+      lexicalBuf += currentByte
+      state match {
+        case NOP => {
+          if(lexicalBuf.findFromLast('"', true)){
+            state = START_STRING
+          }
+          else if(lexicalBuf.findFromLast("`", true)){
+            lexicalBuf.clear()
+            state = START_RAW_STRING
+          }
+          else if(lexicalBuf.findFromLast("/*", true)){
+            lexicalBuf.clear()
+            state = START_TRANDITIONAL_COMMENT
+          }
+          else if(lexicalBuf.findFromLast("//", true)){
+            lexicalBuf.clear()
+            state = START_EOL_COMMENT
+          }
+        }
+        case START_TRANDITIONAL_COMMENT =>{
+          if(lexicalBuf.findFromLast("*/", true)){
+            lexicalBuf.trimEnd(2)
+            listBuffer += lexicalBuf.toArray
+            state = NOP
+          }
+        }
+        case START_EOL_COMMENT => {
+          if(lexicalBuf.findFromLast("\r\n", true)){
+            lexicalBuf.trimEnd(2)
+            listBuffer += lexicalBuf.toArray
+            state = NOP
+          }else if(lexicalBuf.findFromLast("\n", true)){
+            lexicalBuf.trimEnd(1)
+            listBuffer += lexicalBuf.toArray
+            state = NOP
+          }
+        }
+        case START_STRING => {
+          if(lexicalBuf.findFromLast('"', false)){
+            state = NOP
+          }
+        }
+        case START_RAW_STRING => {
+          if(lexicalBuf.findFromLast('`', false)){
+            state = NOP
+          }
+        }
+      }
+      currentByte = stream.read() //read a next byte
+    }
+    Option(listBuffer.toList)
+  }
+
+
+  /** Parse comments from a byte stream of .java
+    * 
+    * @param stream a stream to parse
+    * @return a list of byte arrays
+    */
+  def parseJsType(stream: InputStream): Option[List[Array[Byte]]] = {
+    //https://www.ecma-international.org/publications/files/ECMA-ST/Ecma-262.pdf
+    val listBuffer = new ListBuffer[Array[Byte]]()
+    val lexicalBuf = new ArrayBuffer[Byte]()
+    val NOP = -1
+    val START_TRANDITIONAL_COMMENT = 0
+    val START_EOL_COMMENT = 1
+    val START_DOUBLE_STRING = 2
+    val START_SINGLE_STRING = 3
+
+    var state: Int = NOP
+    var currentByte = stream.read() //read a first byte
+    while(currentByte != -1){
+      //FSM
+      lexicalBuf += currentByte
+      state match {
+        case NOP => {
+          if(lexicalBuf.findFromLast('"', true)){
+            state = START_DOUBLE_STRING
+          }
+          else if(lexicalBuf.findFromLast('\'', true)){
+            state = START_SINGLE_STRING
+          }
+          else if(lexicalBuf.findFromLast("/*", true)){
+            lexicalBuf.clear()
+            state = START_TRANDITIONAL_COMMENT
+          }
+          else if(lexicalBuf.findFromLast("//", true)){
+            lexicalBuf.clear()
+            state = START_EOL_COMMENT
+          }
+        }
+        case START_TRANDITIONAL_COMMENT =>{
+          if(lexicalBuf.findFromLast("*/", true)){
+            lexicalBuf.trimEnd(2)
+            listBuffer += lexicalBuf.toArray
+            state = NOP
+          }
+        }
+        case START_EOL_COMMENT => {
+          if(lexicalBuf.findFromLast("\r\n", true)){
+            lexicalBuf.trimEnd(2)
+            listBuffer += lexicalBuf.toArray
+            state = NOP
+          }else if(lexicalBuf.findFromLast("\n", true)){
+            lexicalBuf.trimEnd(1)
+            listBuffer += lexicalBuf.toArray
+            state = NOP
+          }
+        }
+        case START_DOUBLE_STRING => {
+          if(lexicalBuf.findFromLast('"', false)){
+            state = NOP
+          }
+        }
+        case START_SINGLE_STRING => {
+          if(lexicalBuf.findFromLast('\'', false)){
+            state = NOP
+          }
+        }
+      }
+      currentByte = stream.read() //read a next byte
     }
     Option(listBuffer.toList)
   }

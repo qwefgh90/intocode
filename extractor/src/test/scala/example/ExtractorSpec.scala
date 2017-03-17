@@ -88,6 +88,20 @@ usage:"""))
     (rbList(1) should equal ("""can you see it? mutiline comment""")) (after being ignoreSpecialChars)
   }
 
+  "Results of extracting go.go" should "be equal to 5th, 6th comment" in {
+    val goUri = getClass.getResource("/go.go").toURI
+    val goList = extractComments(goUri, "go.go").get
+    (goList(4) shouldEqual """ e.g. it matches what we generate with Sign() """) (after being ignoreSpecialChars)
+    (goList(5) should equal (""" It's a traditional comment.It's a traditional comment.""")) (after being ignoreSpecialChars)
+  }
+
+  "Results of extracting js.js" should "be equal to 1th, 16th comment" in {
+    val jsUri = getClass.getResource("/js.js").toURI
+    val jsList = extractComments(jsUri, "js.js").get
+    (jsList(0) shouldEqual """eslint-disable no-unused-vars""") (after being ignoreSpecialChars)
+    (jsList(15) should equal ("""  build.js inserts compiled jQuery here""")) (after being ignoreSpecialChars)
+  }
+
   "Parser" should "return a count of comments we excect" in {
     val javaStream = getClass.getResourceAsStream("/java.java")
     val javaList = parseJavaType(javaStream)
@@ -124,6 +138,18 @@ usage:"""))
     rubyList should not be None
     rubyList.get.size shouldEqual 2
     rubyStream.close()
+
+    val goStream = getClass.getResourceAsStream("/go.go")
+    val goList = parseGoType(goStream)
+    goList should not be None
+    goList.get.size shouldEqual 6
+    goStream.close()
+
+    val jsStream = getClass.getResourceAsStream("/js.js")
+    val jsList = parseJsType(jsStream)
+    jsList should not be None
+    jsList.get.size shouldEqual 16
+    jsStream.close()
 
   }
 

@@ -134,6 +134,13 @@ object Extractor {
       case RUBY_TYPE => {
         parseRubyType(stream)
       }
+      case GO_TYPE => {
+        parseGoType(stream)
+      }
+      case JS_TYPE => {
+        parseJsType(stream)
+      }
+
     }
   }
 }
