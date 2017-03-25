@@ -5,7 +5,6 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.11.8",
   libraryDependencies += scalaTest % Test,
   libraryDependencies += scalaTestPlus % Test,
-
   libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.1.7",
   libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0"
 )

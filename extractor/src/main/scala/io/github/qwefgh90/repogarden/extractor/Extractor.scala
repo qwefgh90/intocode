@@ -140,6 +140,15 @@ object Extractor {
       case JS_TYPE => {
         parseJsType(stream)
       }
+      case HTML_TYPE => {
+        parseHtmlType(stream)
+      }
+      case BAT_TYPE => {
+        parseBatType(stream)
+      }
+      case SH_TYPE => {
+        parseShType(stream)
+      }
 
     }
   }

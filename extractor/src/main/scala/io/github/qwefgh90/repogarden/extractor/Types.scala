@@ -20,7 +20,7 @@ object Types {
   //Languages work on Browser
   val JS_TYPE = JSearch.getContentType(dummy, "hello.js")
   val HTML_TYPE = JSearch.getContentType(dummy, "hello.html")
-  val CSS_TYPE = JSearch.getContentType(dummy, "hello.css")
+  //val CSS_TYPE = JSearch.getContentType(dummy, "hello.css")
 
   //Languages work on Shell
   val BAT_TYPE = JSearch.getContentType(dummy, "hello.bat")
@@ -28,7 +28,7 @@ object Types {
 
   //Text format
   val XML_TYPE = JSearch.getContentType(dummy, "hello.xml")
-  val PROP_TPYE = JSearch.getContentType(dummy, "hello.properties")
+  //val PROP_TPYE = JSearch.getContentType(dummy, "hello.properties")
   val TEXT_TYPE = JSearch.getContentType(dummy, "hello.txt")
 
   //ETC format

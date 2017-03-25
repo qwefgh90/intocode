@@ -46,7 +46,7 @@ class ExtractorSpec extends FlatSpec with Matchers {
     (javaList(6) should equal (""" load from property file""")) (after being ignoreSpecialChars)
   }
 
-  "Results of extracting py.py" should "be equal to a part of 5th comment, 6th" in {
+  "Results of extracting py.py" should "be equal to 5th, 6th comment" in {
     val pyUri = getClass.getResource("/py.py").toURI
     val pyList = extractComments(pyUri, "py.py").get
     (pyList(5) should startWith ("""
@@ -102,6 +102,28 @@ usage:"""))
     (jsList(15) should equal ("""  build.js inserts compiled jQuery here""")) (after being ignoreSpecialChars)
   }
 
+  "Results of extracting html.html" should "be equal to 1th, 2th comment" in {
+    val htmlUri = getClass.getResource("/html.html").toURI
+    val htmlList = extractComments(htmlUri, "html.html").get
+    (htmlList(0) shouldEqual """<script type='text/javascript' src='http://getfirebug.com/releases/lite/1.2/firebug-lite-compressed.js'></script>""") (after being ignoreSpecialChars)
+    (htmlList(1) should equal (""" app title """)) (after being ignoreSpecialChars)
+  }
+
+  "Results of extracting bat.bat" should "be equal to 1th, 18th comment" in {
+    val batUri = getClass.getResource("/bat.bat").toURI
+    val batList = extractComments(batUri, "bat.bat").get
+    (batList(0) shouldEqual """Licensed to the Apache Software Foundation (ASF) under one or more""") (after being ignoreSpecialChars)
+    (batList(17) should equal ("""Get remaining unshifted command line arguments and save them in the""")) (after being ignoreSpecialChars)
+  }
+
+  "Results of extracting sh.sh" should "be equal to 1th, 22th comment" in {
+    val shUri = getClass.getResource("/sh.sh").toURI
+    val shList = extractComments(shUri, "sh.sh").get
+    (shList(0) shouldEqual """!/bin/sh""") (after being ignoreSpecialChars)
+    (shList(21) should equal (""" -x will Only work on the os400 if the files are:""")) (after being ignoreSpecialChars)
+  }
+
+
   "Parser" should "return a count of comments we excect" in {
     val javaStream = getClass.getResourceAsStream("/java.java")
     val javaList = parseJavaType(javaStream)
@@ -150,6 +172,24 @@ usage:"""))
     jsList should not be None
     jsList.get.size shouldEqual 16
     jsStream.close()
+
+    val htmlStream = getClass.getResourceAsStream("/html.html")
+    val htmlList = parseHtmlType(htmlStream)
+    htmlList should not be None
+    htmlList.get.size shouldEqual 9
+    htmlStream.close()
+
+    val batStream = getClass.getResourceAsStream("/bat.bat")
+    val batList = parseBatType(batStream)
+    batList should not be None
+    batList.get.size shouldEqual 18
+    batStream.close()
+
+    val shStream = getClass.getResourceAsStream("/sh.sh")
+    val shList = parseShType(shStream)
+    shList should not be None
+    shList.get.size shouldEqual 25
+    shStream.close()
 
   }
 

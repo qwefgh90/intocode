@@ -49,6 +49,22 @@ object Parser{
       else
         rightPart.sameElements(bytesToFind)
     }
+    def findFromFirst(str: String): Boolean = {
+      val bytesToFind = str.getBytes()
+      val leftPart = array.take(bytesToFind.length)
+      if(leftPart.lengthCompare(bytesToFind.length) != 0)
+        false
+      else
+        leftPart.sameElements(bytesToFind)
+    }
+    def findFromFirstIgnoreCase(str: String): Boolean = {
+      val bytesToFind = str.toLowerCase.getBytes()
+      val leftPart = array.take(bytesToFind.length).map(b => b.toChar.toLower.toByte)
+      if(leftPart.lengthCompare(bytesToFind.length) != 0)
+        false
+      else
+        leftPart.sameElements(bytesToFind)
+    }
   }
 
   /** Parse comments from a byte stream of .java
@@ -493,7 +509,7 @@ def parseGoType(stream: InputStream): Option[List[Array[Byte]]] =
   }
 
 
-  /** Parse comments from a byte stream of .java
+  /** Parse comments from a byte stream of .js
     * 
     * @param stream a stream to parse
     * @return a list of byte arrays
@@ -563,4 +579,169 @@ def parseGoType(stream: InputStream): Option[List[Array[Byte]]] =
     }
     Option(listBuffer.toList)
   }
+  /** Parse comments from a byte stream of .html
+    * 
+    * @param stream a stream to parse
+    * @return a list of byte arrays
+    */
+  def parseHtmlType(stream: InputStream): Option[List[Array[Byte]]] = {
+    //https://www.w3.org/TR/html4/intro/sgmltut.html#h-3.2.4
+    val listBuffer = new ListBuffer[Array[Byte]]()
+    val lexicalBuf = new ArrayBuffer[Byte]()
+    val NOP = -1
+    val START_COMMENT = 0
+    val START_COMMENT_DOUBLE_DASH = 1
+
+    var state: Int = NOP
+    var currentByte = stream.read() //read a first byte
+    while(currentByte != -1){
+      //FSM
+      lexicalBuf += currentByte
+      state match {
+        case NOP => {
+          if(lexicalBuf.findFromLast("<!--", true)){
+            lexicalBuf.clear()
+            state = START_COMMENT
+          }
+        }
+        case START_COMMENT =>{
+          if(lexicalBuf.findFromLast("--", true)){
+            state = START_COMMENT_DOUBLE_DASH
+          }
+        }
+        case START_COMMENT_DOUBLE_DASH => {
+          if(lexicalBuf.findFromLast(">", true)){
+            lexicalBuf.trimEnd(3)
+            listBuffer += lexicalBuf.toArray
+            state = NOP
+          }else if(lexicalBuf.findFromLast(" ", true)){
+            lexicalBuf.trimEnd(1)
+          }else{
+            state = START_COMMENT
+          }
+        }
+      }
+      currentByte = stream.read() //read a next byte
+    }
+    Option(listBuffer.toList)
+  }
+
+  /** Parse comments from a byte stream of .bat
+    * 
+    * @param stream a stream to parse
+    * @return a list of byte arrays
+    */
+  def parseBatType(stream: InputStream): Option[List[Array[Byte]]] = {
+    //
+    val listBuffer = new ListBuffer[Array[Byte]]()
+    val lexicalBuf = new ArrayBuffer[Byte]()
+    val NOP = -1
+    val START_COMMENT = 0
+
+    var state: Int = NOP
+    var currentByte = stream.read() //read a first byte
+    while(currentByte != -1){
+      //FSM
+      lexicalBuf += currentByte
+      state match {
+        case NOP => {
+          if(currentByte == '\n')
+            lexicalBuf.clear()
+          else if(lexicalBuf.findFromFirstIgnoreCase("rem ")){
+            lexicalBuf.clear()
+            state = START_COMMENT
+          }
+          else if(currentByte == ' ')
+            lexicalBuf.trimEnd(1)
+        }
+        case START_COMMENT =>{
+          if(lexicalBuf.findFromLast("\r\n", false)){
+            lexicalBuf.trimEnd(2)
+            listBuffer += lexicalBuf.toArray
+            lexicalBuf.clear()
+            state = NOP
+          }
+          else if(lexicalBuf.findFromLast("\n", false)){
+            lexicalBuf.trimEnd(1)
+            listBuffer += lexicalBuf.toArray
+            lexicalBuf.clear()
+            state = NOP
+          }
+        }
+      }
+      currentByte = stream.read() //read a next byte
+    }
+    Option(listBuffer.toList)
+  }
+
+
+
+  /** Parse comments from a byte stream of .sh
+    * 
+    * @param stream a stream to parse
+    * @return a list of byte arrays
+    */
+  def parseShType(stream: InputStream): Option[List[Array[Byte]]] = {
+
+    //http://pubs.opengroup.org/onlinepubs/009695399/utilities/xcu_chap02.html
+    val listBuffer = new ListBuffer[Array[Byte]]()
+    val lexicalBuf = new ArrayBuffer[Byte]()
+    val NOP = -1
+    val START_COMMENT = 0
+    val START_STRING_SINGLE = 1
+    val START_STRING_DOUBLE = 2
+
+    var state: Int = NOP
+    var currentByte = stream.read() //read a first byte
+    while(currentByte != -1){
+      //FSM
+      lexicalBuf += currentByte
+      state match {
+        case NOP => {
+          if(currentByte == '\''){
+            lexicalBuf.clear()
+            state = START_STRING_SINGLE
+          }
+          else if(currentByte == '\"'){
+            lexicalBuf.clear()
+            state = START_STRING_DOUBLE
+          }
+          else if(currentByte == '#'){
+            lexicalBuf.clear()
+            state = START_COMMENT
+          }
+        }
+        case START_STRING_SINGLE => {
+          if(lexicalBuf.findFromLast('\'', false)){
+            lexicalBuf.clear()
+            state = NOP
+          }
+        }
+        case START_STRING_DOUBLE =>{
+          if(lexicalBuf.findFromLast('"', false)){
+            lexicalBuf.clear()
+            state = NOP
+          }
+        }
+        case START_COMMENT => {
+          if(lexicalBuf.findFromLast("\r\n", false)){
+            lexicalBuf.trimEnd(2)
+            listBuffer += lexicalBuf.toArray
+            lexicalBuf.clear()
+            state = NOP
+          }
+          else if(lexicalBuf.findFromLast('\n', false)){
+            lexicalBuf.trimEnd(1)
+            listBuffer += lexicalBuf.toArray
+            lexicalBuf.clear()
+            state = NOP
+          }
+        }
+      }
+      currentByte = stream.read() //read a next byte
+    }
+    Option(listBuffer.toList)
+  }
+
+//https://www.w3.org/XML/Core/#Publications
 }
