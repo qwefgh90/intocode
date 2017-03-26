@@ -3,23 +3,13 @@ package io.github.qwefgh90.repogarden.extractor
 import java.io._
 import scala.collection.mutable._
 import scala.util.matching.Regex
+
+import io.github.qwefgh90.bp.Boilerplate._
 import com.typesafe.scalalogging._
 
 /** Object contains various comment parsers. */
 object Parser{
   val logger = Logger(Parser.getClass)
-
-  def readBytes(stream: InputStream)(op: Byte => Unit) = {
-    var currentByte = stream.read()
-    while(currentByte != -1){
-      op(currentByte)
-      currentByte = stream.read()
-    }
-  }
-
-  implicit def intToByte(input: Int): Byte = {
-    input.toByte
-  }
 
   implicit def bufferToWrapper(array: ArrayBuffer[Byte]) = {
     new WrapperArrayByffer(array)
@@ -139,7 +129,7 @@ object Parser{
     val START_STRING_TRIPLE = 4
 
     var state: Int = NOP
-    readBytes(stream){ currentByte: Byte => {
+    readStream(stream){ currentByte: Byte => {
       //https://docs.python.org/3/reference/lexical_analysis.html#literals
       //https://docs.python.org/2/reference/lexical_analysis.html#string-literals
 
@@ -281,7 +271,7 @@ def parseScalaType(stream: InputStream): Option[List[Array[Byte]]] = {
     val START_STRING = 3
     val START_MULTI_STRING = 4
     var state: Int = NOP
-    readBytes(stream){ currentByte: Byte => {
+    readStream(stream){ currentByte: Byte => {
       //https://www.scala-lang.org/files/archive/spec/2.11/01-lexical-syntax.html#string-literals
       lexicalBuf += currentByte
       state match {
@@ -361,7 +351,7 @@ def parseRubyType(stream: InputStream): Option[List[Array[Byte]]] = {
   var beginingDelimiter = 0
     var signifierDelimiter = ""
     var state: Int = NOP
-    readBytes(stream){ currentByte: Byte => {
+    readStream(stream){ currentByte: Byte => {
       //http://www.ipa.go.jp/files/000011432.pdf
       lexicalBuf += currentByte
       state match {

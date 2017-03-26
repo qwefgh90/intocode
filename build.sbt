@@ -5,11 +5,12 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.11.8",
   libraryDependencies += scalaTest % Test,
   libraryDependencies += scalaTestPlus % Test,
+  libraryDependencies += "org.apache.commons" % "commons-io" % "1.3.2",
   libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.1.7",
   libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0"
 )
 
-lazy val extractor = (project in file("extractor")).
+lazy val extractor = (project in file("extractor")).dependsOn(bp).
   settings(
     commonSettings,
     version := "0.1.0-SNAPSHOT",
@@ -22,6 +23,22 @@ lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(extra
     commonSettings,
     version := "0.1.0-SNAPSHOT",
     name := "web",
-    libraryDependencies += filters,
-    libraryDependencies += "com.redhat.victims" % "victims-lib" % "1.3.2"
+    libraryDependencies += filters
+  )
+
+lazy val victims_client = (project in file("victims-client")).dependsOn(bp).
+  settings(
+    commonSettings,
+    version := "0.1.0-SNAPSHOT",
+    name := "victims-client",
+    libraryDependencies += "com.redhat.victims" % "victims-lib" % "1.3.2",
+    libraryDependencies += "org.apache.maven" % "maven-model" % "3.3.9"
+  )
+
+lazy val bp = (project in file("bp")).
+  settings(
+    commonSettings,
+    version := "0.1.0-SNAPSHOT",
+    name := "bp",
+    libraryDependencies += "com.googlecode.juniversalchardet" % "juniversalchardet" % "1.0.3"
   )

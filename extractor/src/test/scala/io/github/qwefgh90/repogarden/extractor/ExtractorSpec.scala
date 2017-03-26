@@ -1,4 +1,4 @@
-package example
+package io.github.qwefgh90.repogarden.extractor
 
 import org.scalatest._
 import org.scalactic._
@@ -10,6 +10,7 @@ import java.io.File
 
 import io.github.qwefgh90.repogarden.extractor.Parser._
 import io.github.qwefgh90.repogarden.extractor.Extractor._
+import io.github.qwefgh90.repograden.bp.Boilerplate._
 
 import org.mozilla.universalchardet.UniversalDetector
 import io.github.qwefgh90.jsearch._
@@ -29,11 +30,7 @@ class ExtractorSpec extends FlatSpec with Matchers {
           case _ => o
         }
     }
-
-  implicit def intToByte(input: Int): Byte = {
-    input.toByte
-  }
-
+  
   "Results of extracting java.java" should "be equal to 5th, 6th comment" in {
     val javaUri = getClass.getResource("/java.java").toURI
     val javaList = extractComments(javaUri, "java.java").get
