@@ -4,7 +4,7 @@ import java.io._
 import scala.collection.mutable._
 import scala.util.matching.Regex
 
-import io.github.qwefgh90.bp.Boilerplate._
+import io.github.qwefgh90.repogarden.bp.Boilerplate._
 import com.typesafe.scalalogging._
 
 /** Object contains various comment parsers. */

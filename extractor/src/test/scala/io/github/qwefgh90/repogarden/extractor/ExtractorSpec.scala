@@ -10,7 +10,7 @@ import java.io.File
 
 import io.github.qwefgh90.repogarden.extractor.Parser._
 import io.github.qwefgh90.repogarden.extractor.Extractor._
-import io.github.qwefgh90.repograden.bp.Boilerplate._
+import io.github.qwefgh90.repogarden.bp.Boilerplate._
 
 import org.mozilla.universalchardet.UniversalDetector
 import io.github.qwefgh90.jsearch._

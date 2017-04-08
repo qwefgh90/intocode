@@ -8,7 +8,7 @@ import Parser._
 
 import scala.collection.mutable._
 
-import io.github.qwefgh90.bp.Boilerplate._
+import io.github.qwefgh90.repogarden.bp.Boilerplate._
 
 import org.apache.tika.mime._
 import io.github.qwefgh90.jsearch._

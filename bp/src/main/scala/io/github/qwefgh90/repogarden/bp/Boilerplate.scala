@@ -1,4 +1,4 @@
-package io.github.qwefgh90.repograden.bp
+package io.github.qwefgh90.repogarden.bp
 
 import java.io._
 import java.net._
