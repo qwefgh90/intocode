@@ -32,8 +32,8 @@ lazy val victims_client = (project in file("victims-client")).dependsOn(bp).
     commonSettings,
     version := "0.1.0-SNAPSHOT",
     name := "victims-client",
-    libraryDependencies += "org.yaml" % "snakeyaml" % "1.18",
-    libraryDependencies += "org.apache.maven" % "maven-model" % "3.3.9"
+    libraryDependencies += "org.apache.maven" % "maven-model" % "3.3.9",
+    libraryDependencies += "com.esotericsoftware.yamlbeans" % "yamlbeans" % "1.08"
   )
 
 lazy val bp = (project in file("bp")).
