@@ -3,6 +3,7 @@ import Dependencies._
 lazy val commonSettings = Seq(
   organization := "io.github.qwefgh90",
   scalaVersion := "2.11.8",
+  fork in Test := false,
   libraryDependencies += scalaTest % Test,
   libraryDependencies += scalaTestPlus % Test,
   libraryDependencies += "org.apache.commons" % "commons-io" % "1.3.2",

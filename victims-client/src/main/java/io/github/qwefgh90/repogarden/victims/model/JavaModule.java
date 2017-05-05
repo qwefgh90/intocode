@@ -12,46 +12,71 @@ public class JavaModule {
 	String artifactId;
 	List<String> version;
 	List<String> fixedin;
+	List<String> unaffected;
+	
 	public String getGroupId() {
 		return groupId;
 	}
+
+
 	public void setGroupId(String groupId) {
 		this.groupId = groupId;
 	}
+
+
 	public String getArtifactId() {
 		return artifactId;
 	}
+
+
 	public void setArtifactId(String artifactId) {
 		this.artifactId = artifactId;
 	}
+
+
 	public List<String> getVersion() {
 		return version;
 	}
+
+
 	public void setVersion(List<String> version) {
 		this.version = version;
 	}
+
+
 	public List<String> getFixedin() {
 		return fixedin;
 	}
+
+
 	public void setFixedin(List<String> fixedin) {
 		this.fixedin = fixedin;
 	}
-	@Override
-	public String toString() {
-		return "JavaModule [groupId=" + groupId + ", artifactId=" + artifactId
-				+ ", version=" + version + ", fixedin=" + fixedin + "]";
+
+
+	public List<String> getUnaffected() {
+		return unaffected;
 	}
+
+
+	public void setUnaffected(List<String> unaffected) {
+		this.unaffected = unaffected;
+	}
+
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result
-				+ ((artifactId == null) ? 0 : artifactId.hashCode());
+		result = prime * result + ((artifactId == null) ? 0 : artifactId.hashCode());
 		result = prime * result + ((fixedin == null) ? 0 : fixedin.hashCode());
 		result = prime * result + ((groupId == null) ? 0 : groupId.hashCode());
+		result = prime * result + ((unaffected == null) ? 0 : unaffected.hashCode());
 		result = prime * result + ((version == null) ? 0 : version.hashCode());
 		return result;
 	}
+
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -76,6 +101,11 @@ public class JavaModule {
 				return false;
 		} else if (!groupId.equals(other.groupId))
 			return false;
+		if (unaffected == null) {
+			if (other.unaffected != null)
+				return false;
+		} else if (!unaffected.equals(other.unaffected))
+			return false;
 		if (version == null) {
 			if (other.version != null)
 				return false;
@@ -83,14 +113,26 @@ public class JavaModule {
 			return false;
 		return true;
 	}
-	public JavaModule(String groupId, String artifactId, List<String> version,
-			List<String> fixedin) {
+
+
+	public JavaModule(String groupId, String artifactId, List<String> version, List<String> fixedin,
+			List<String> unaffected) {
 		super();
 		this.groupId = groupId;
 		this.artifactId = artifactId;
 		this.version = version;
 		this.fixedin = fixedin;
+		this.unaffected = unaffected;
 	}
+
+
+	@Override
+	public String toString() {
+		return "JavaModule [groupId=" + groupId + ", artifactId=" + artifactId + ", version=" + version + ", fixedin="
+				+ fixedin + ", unaffected=" + unaffected + "]";
+	}
+
+
 	public JavaModule() {
 		super();
 	}
