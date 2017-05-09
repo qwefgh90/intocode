@@ -86,9 +86,13 @@ class VictimsLoader(oauthToken: Option[String]) {
 		  throw new RuntimeException("The iterator of first commits page must have more items than zero") 
 	}
 	
-	case class VulnerableCheckResult(vulnerableVersionList: List[Option[String]], relatedJavaModule: JavaModule, relatedCve: Victim)
+	case class VulnerablePart(vulnerableVersionList: List[Option[String]], relatedJavaModule: JavaModule, relatedCve: Victim)
+	case class VulnerableResult(vulerableList: List[VulnerablePart])
 	
-	def scanSingleArtifact(groupId: String, artifactId: String, version: String): Option[List[VulnerableCheckResult]] = {
+	/** Return a vulnerable list wrapped by Option if related vulnerables exists.
+	 * 
+	 */
+	def scanSingleArtifact(groupId: String, artifactId: String, version: String): Option[VulnerableResult] = {
 	  val cveMap = getLatestCveMap
 	  val key = groupId + "%" + artifactId
 	  if(cveMap.contains(key)){
@@ -126,9 +130,13 @@ class VictimsLoader(oauthToken: Option[String]) {
 	        else
 	        	Option.empty
 	      })
-	      VulnerableCheckResult(resultListForEachVersion.toList, artifact._1, artifact._2)
-	    })
-	    Option(resultTuple)
+	      VulnerablePart(resultListForEachVersion.filter(versionOpt => versionOpt.isDefined).toList, artifact._1, artifact._2)
+	    }).filter(part => part.vulnerableVersionList.size > 0)
+	    val vulnerableResult = VulnerableResult(resultTuple)
+	    if(vulnerableResult.vulerableList.isEmpty)
+	      Option.empty
+	    else
+	    	Option(vulnerableResult)
 	  }else
 	    Option.empty
 		}

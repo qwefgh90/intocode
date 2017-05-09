@@ -11,7 +11,7 @@ import com.typesafe.scalalogging._
 object Parser{
   val logger = Logger(Parser.getClass)
 
-  implicit def bufferToWrapper(array: ArrayBuffer[Byte]) = {
+  implicit def bufferToWrapper(array: ArrayBuffer[Char]) = {
     new WrapperArrayByffer(array)
   }
 
@@ -19,7 +19,7 @@ object Parser{
     * @constructor create new wrapper for finding sequence
     * @param array an array to be wrapped
     */
-  class WrapperArrayByffer(array: ArrayBuffer[Byte]){
+  class WrapperArrayByffer(array: ArrayBuffer[Char]){
     def findFromLast(ch: Char, allowFrontBackslash: Boolean):Boolean = {
       findFromLast(ch.toString, allowFrontBackslash)
     }
@@ -56,61 +56,67 @@ object Parser{
         leftPart.sameElements(bytesToFind)
     }
   }
-
+  
+  case class CommentResult(startOffset: Int, charArray: Array[Char])
+  
   /** Parse comments from a byte stream of .java
     * 
     * @param stream a stream to parse
     * @return a list of byte arrays
     */
-  def parseJavaType(stream: InputStream): Option[List[Array[Byte]]] = {
+  def parseJavaType(stream: InputStreamReader): Option[List[Array[Char]]] = {
     //https://docs.oracle.com/javase/specs/jls/se8/html/jls-3.html#jls-3.7
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
-    val START_TRANDITIONAL_COMMENT = 0
-    val START_EOL_COMMENT = 1
-    val START_STRING = 2
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+  
+    sealed trait JavaState
+    case object Nop extends JavaState
+    case object StartTranditionalComment extends JavaState
+    case object StartEolComment extends JavaState
+    case object StartString extends JavaState
 
-    var state: Int = NOP
+    var offset: Int = 0
+    var state: JavaState = Nop
     var currentByte = stream.read() //read a first byte
     while(currentByte != -1){
       //FSM
-      lexicalBuf += currentByte
+      offset += 1
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(lexicalBuf.findFromLast('"', true)){
-            state = START_STRING
+            state = StartString
           }
           else if(lexicalBuf.findFromLast("/*", true)){
             lexicalBuf.clear()
-            state = START_TRANDITIONAL_COMMENT
+            state = StartTranditionalComment
           }
           else if(lexicalBuf.findFromLast("//", true)){
             lexicalBuf.clear()
-            state = START_EOL_COMMENT
+            state = StartEolComment
           }
         }
-        case START_TRANDITIONAL_COMMENT =>{
+        case StartTranditionalComment =>{
           if(lexicalBuf.findFromLast("*/", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_EOL_COMMENT => {
+        case StartEolComment => {
           if(lexicalBuf.findFromLast("\r\n", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }else if(lexicalBuf.findFromLast("\n", true)){
             lexicalBuf.trimEnd(1)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_STRING => {
+        case StartString => {
           if(lexicalBuf.findFromLast('"', false)){
-            state = NOP
+            state = Nop
           }
         }
       }
@@ -118,84 +124,87 @@ object Parser{
     }
     Option(listBuffer.toList)
   }
-  def parsePyType(stream: InputStream): Option[List[Array[Byte]]] = {
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
-    val START_SHARP = 0
-    val START_TRIPLE = 1
-    val START_STRING_SINGLE = 2
-    val START_STRING_DOUBLE = 3
-    val START_STRING_TRIPLE = 4
+  
+  def parsePyType(stream: InputStreamReader): Option[List[Array[Char]]] = {
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+    
+    sealed trait PyState
+    case object Nop extends PyState
+    case object StartSharp extends PyState
+    case object StartTriple extends PyState
+    case object StartStringSingle extends PyState
+    case object StartStringDouble extends PyState
+    case object StartStringTriple extends PyState
 
-    var state: Int = NOP
-    readStream(stream){ currentByte: Byte => {
+    var state: PyState = Nop
+    readStream(stream){ currentByte: Char => {
       //https://docs.python.org/3/reference/lexical_analysis.html#literals
       //https://docs.python.org/2/reference/lexical_analysis.html#string-literals
 
-      lexicalBuf += currentByte
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(lexicalBuf.findFromLast("'", true)){
-            state = START_STRING_SINGLE
+            state = StartStringSingle
           }else if(lexicalBuf.findFromLast('"', true)){
-            state = START_STRING_DOUBLE
+            state = StartStringDouble
           }else if(lexicalBuf.findFromLast('#', true)){
             lexicalBuf.clear()
-            state = START_SHARP
+            state = StartSharp
           }
         }
-        case START_STRING_SINGLE => {
+        case StartStringSingle => {
           if(lexicalBuf.findFromLast("'''", false)){
             lexicalBuf.clear()
-            state = START_STRING_TRIPLE
+            state = StartStringTriple
           }
           else if(lexicalBuf.dropRight(1).findFromLast("''", false)){
-            state = NOP
+            state = Nop
           }
           else if(lexicalBuf.findFromLast("''", false)){
             //pass
           }
           else if(lexicalBuf.findFromLast("'", false)){
-            state = NOP
+            state = Nop
           }
         }
-        case START_STRING_DOUBLE => {
+        case StartStringDouble => {
           if(lexicalBuf.findFromLast("\"\"\"", false)){
             lexicalBuf.clear()
-            state = START_TRIPLE
+            state = StartTriple
           }
           else if(lexicalBuf.dropRight(1).findFromLast("\"\"", false)){
-            state = NOP
+            state = Nop
           }
           else if(lexicalBuf.findFromLast("\"\"", false)){
             //pass
           }
           else if(lexicalBuf.findFromLast("\"", false)){
-            state = NOP
+            state = Nop
           }
         }
-        case START_STRING_TRIPLE => {
+        case StartStringTriple => {
           if(lexicalBuf.findFromLast("'''", false)){
-            state = NOP
+            state = Nop
           }
         }
-        case START_TRIPLE => {
+        case StartTriple => {
           if(lexicalBuf.findFromLast("\"\"\"", false)){
             lexicalBuf.trimEnd(3)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_SHARP => {
+        case StartSharp => {
           if(lexicalBuf.findFromLast("\n", true)){
             lexicalBuf.trimEnd(1)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }else if(lexicalBuf.findFromLast("\r\n", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
       }
@@ -203,57 +212,63 @@ object Parser{
     }
     Option(listBuffer.toList)
   }
-  def parseCType(stream: InputStream): Option[List[Array[Byte]]] = 
+  def parseCType(stream: InputStreamReader): Option[List[Array[Char]]] = 
   {
     //http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1124.pdf
     //http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4296.pdf
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+    /*val NOP = -1
     val START_TRANDITIONAL_COMMENT = 0
     val START_EOL_COMMENT = 1
     val START_STRING = 2
+    */
+    sealed trait CState
+    case object Nop extends CState
+    case object StartTranditionalComment extends CState
+    case object StartEolComment extends CState
+    case object StartString extends CState
 
-    var state: Int = NOP
+    var state: CState = Nop
     var currentByte = stream.read() //read a first byte
     while(currentByte != -1){
       //FSM
-      lexicalBuf += currentByte
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(lexicalBuf.findFromLast('"', true)){
-            state = START_STRING
+            state = StartString
           }
           else if(lexicalBuf.findFromLast("/*", true)){
             lexicalBuf.clear()
-            state = START_TRANDITIONAL_COMMENT
+            state = StartTranditionalComment
           }
           else if(lexicalBuf.findFromLast("//", true)){
             lexicalBuf.clear()
-            state = START_EOL_COMMENT
+            state = StartEolComment
           }
         }
-        case START_TRANDITIONAL_COMMENT =>{
+        case StartTranditionalComment =>{
           if(lexicalBuf.findFromLast("*/", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_EOL_COMMENT => {
+        case StartEolComment => {
           if(lexicalBuf.findFromLast("\r\n", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }else if(lexicalBuf.findFromLast("\n", true)){
             lexicalBuf.trimEnd(1)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_STRING => {
+        case StartString => {
           if(lexicalBuf.findFromLast('"', false)){
-            state = NOP
+            state = Nop
           }
         }
       }
@@ -262,66 +277,74 @@ object Parser{
     Option(listBuffer.toList)
   }
 
-def parseScalaType(stream: InputStream): Option[List[Array[Byte]]] = {
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
+def parseScalaType(stream: InputStreamReader): Option[List[Array[Char]]] = {
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+    /*val NOP = -1
     val START_TRANDITIONAL_COMMENT = 1
     val START_EOL_COMMENT = 2
     val START_STRING = 3
     val START_MULTI_STRING = 4
-    var state: Int = NOP
-    readStream(stream){ currentByte: Byte => {
+    */
+    sealed trait ScalaState
+    case object Nop extends ScalaState
+    case object StartTranditionalComment extends ScalaState
+    case object StartEolComment extends ScalaState
+    case object StartString extends ScalaState
+    case object StartMultiString extends ScalaState
+    
+    var state: ScalaState = Nop
+    readStream(stream){ currentByte: Char => {
       //https://www.scala-lang.org/files/archive/spec/2.11/01-lexical-syntax.html#string-literals
-      lexicalBuf += currentByte
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(lexicalBuf.findFromLast("\"", false)){
-            state = START_STRING
+            state = StartString
           }else if(lexicalBuf.findFromLast("/*", false)){
             lexicalBuf.clear()
-            state = START_TRANDITIONAL_COMMENT
+            state = StartTranditionalComment
           }else if(lexicalBuf.findFromLast("//", false)){
             lexicalBuf.clear()
-            state = START_EOL_COMMENT
+            state = StartEolComment
           }
         }
-        case START_STRING => {
+        case StartString => {
           if(lexicalBuf.findFromLast("\"\"\"", false)){
             lexicalBuf.clear()
-            state = START_MULTI_STRING
+            state = StartMultiString
           }
           else if(lexicalBuf.dropRight(1).findFromLast("\"\"", false)){
-            state = NOP
+            state = Nop
           }
           else if(lexicalBuf.findFromLast("\"\"", false)){
             //pass
           }
           else if(lexicalBuf.findFromLast("\"", false)){
-            state = NOP
+            state = Nop
           }
         }
-        case START_MULTI_STRING => {
+        case StartMultiString => {
           if(lexicalBuf.findFromLast("\"\"\"", false)){
-            state = NOP
+            state = Nop
           }
         }
-        case START_TRANDITIONAL_COMMENT => {
+        case StartTranditionalComment => {
           if(lexicalBuf.findFromLast("*/", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_EOL_COMMENT => {
+        case StartEolComment => {
           if(lexicalBuf.findFromLast("\n", true)){
             lexicalBuf.trimEnd(1)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }else if(lexicalBuf.findFromLast("\r\n", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
       }
@@ -329,20 +352,19 @@ def parseScalaType(stream: InputStream): Option[List[Array[Byte]]] = {
     }
     Option(listBuffer.toList)
   }
-def parseRubyType(stream: InputStream): Option[List[Array[Byte]]] = {
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
-    val START_COMMENT_SINGLE = 1
-    val START_COMMENT_MULTI = 2
-    val START_STRING_SINGLE = 4
-    val START_STRING_DOUBLE = 5
-    val START_STRING_NON_EXPANDED = 6
-    val START_STRING_EXPANDED = 7
-    val START_HERE_DOC = 8
-    val START_HERE_DOC_SINGLE_QUOTED = 9
-    val START_HERE_DOC_DOUBLE_QUOTED = 10
-    val START_HERE_DOC_COMMAND_QUOTED = 11
+def parseRubyType(stream: InputStreamReader): Option[List[Array[Char]]] = {
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+    
+    sealed trait RubyState
+    case object Nop extends RubyState
+    case object StartCommentSingle extends RubyState
+    case object StartCommentMulti extends RubyState
+    case object StartStringSingle extends RubyState
+    case object StartStringDouble extends RubyState
+    case object StartStringNonExpanded extends RubyState
+    case object StartStringExpanded extends RubyState
+    
    def IS_IDENTIFIER_CHARS(byte: Byte) = {
      if(('a' <= byte && byte <= 'z') || ('A' <= byte && byte <= 'Z') || byte == '_' || ('0' <= byte && byte <= '9')) true else false
    }
@@ -350,78 +372,78 @@ def parseRubyType(stream: InputStream): Option[List[Array[Byte]]] = {
   val ENDING_DELIMITER_LIST = List('}',')',']','>')
   var beginingDelimiter = 0
     var signifierDelimiter = ""
-    var state: Int = NOP
-    readStream(stream){ currentByte: Byte => {
+    var state: RubyState = Nop
+    readStream(stream){ currentByte: Char => {
       //http://www.ipa.go.jp/files/000011432.pdf
-      lexicalBuf += currentByte
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(lexicalBuf.findFromLast("'", false)){
             lexicalBuf.clear()
-            state = START_STRING_SINGLE
+            state = StartStringSingle
           }else if(lexicalBuf.findFromLast("\"", false)){
             lexicalBuf.clear()
-            state = START_STRING_DOUBLE
+            state = StartStringDouble
           }else if(lexicalBuf.findFromLast("#", false)){
             lexicalBuf.clear()
-            state = START_COMMENT_SINGLE
+            state = StartCommentSingle
           }else if(lexicalBuf.findFromLast("=begin", false)){
             lexicalBuf.clear()
-            state = START_COMMENT_MULTI
+            state = StartCommentMulti
           }else if(lexicalBuf.dropRight(1).findFromLast("%q", false)){
             if(BEGINING_DELIMITER_LIST.exists(lexicalBuf.findFromLast(_,false))){
               beginingDelimiter = lexicalBuf.last
               lexicalBuf.clear()
-              state = START_STRING_NON_EXPANDED
+              state = StartStringNonExpanded
             }
           }else if(lexicalBuf.dropRight(1).findFromLast("%Q", false)){
             if(BEGINING_DELIMITER_LIST.exists(lexicalBuf.findFromLast(_,false))){
               beginingDelimiter = lexicalBuf.last
               lexicalBuf.clear()
-              state = START_STRING_EXPANDED
+              state = StartStringExpanded
             }
           }
         }
-        case START_STRING_SINGLE => {
+        case StartStringSingle => {
           if(lexicalBuf.findFromLast("'", false)){
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
         }
-        case START_STRING_DOUBLE => {
+        case StartStringDouble => {
           if(lexicalBuf.findFromLast("\"", false)){
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
         }
-        case START_COMMENT_SINGLE => {
+        case StartCommentSingle => {
           if(lexicalBuf.findFromLast("\n", true)){
             lexicalBuf.trimEnd(1)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }else if(lexicalBuf.findFromLast("\r\n", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_COMMENT_MULTI => {
+        case StartCommentMulti => {
           if(lexicalBuf.findFromLast("=end", true)){
             lexicalBuf.trimEnd(4)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_STRING_NON_EXPANDED => {
+        case StartStringNonExpanded => {
           if(lexicalBuf.findFromLast(ENDING_DELIMITER_LIST(BEGINING_DELIMITER_LIST.indexOf(beginingDelimiter)), false)){
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
         }
-        case START_STRING_EXPANDED => {
+        case StartStringExpanded => {
           if(lexicalBuf.findFromLast(ENDING_DELIMITER_LIST(BEGINING_DELIMITER_LIST.indexOf(beginingDelimiter)), false)){
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
         }
       }
@@ -430,66 +452,68 @@ def parseRubyType(stream: InputStream): Option[List[Array[Byte]]] = {
     Option(listBuffer.toList)
   }
 
-def parseGoType(stream: InputStream): Option[List[Array[Byte]]] = 
+def parseGoType(stream: InputStreamReader): Option[List[Array[Char]]] = 
   {
     //https://golang.org/ref/spec#Comments
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
-    val START_TRANDITIONAL_COMMENT = 0
-    val START_EOL_COMMENT = 1
-    val START_STRING = 2
-    val START_RAW_STRING = 3
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+    
+    sealed trait GoState
+    case object Nop extends GoState
+    case object StartTranditionalComment extends GoState
+    case object StartEolComment extends GoState
+    case object StartString extends GoState
+    case object StartRawString extends GoState
 
-    var state: Int = NOP
+    var state: GoState = Nop
     var currentByte = stream.read() //read a first byte
     while(currentByte != -1){
       //FSM
-      lexicalBuf += currentByte
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(lexicalBuf.findFromLast('"', true)){
-            state = START_STRING
+            state = StartString
           }
           else if(lexicalBuf.findFromLast("`", true)){
             lexicalBuf.clear()
-            state = START_RAW_STRING
+            state = StartRawString
           }
           else if(lexicalBuf.findFromLast("/*", true)){
             lexicalBuf.clear()
-            state = START_TRANDITIONAL_COMMENT
+            state = StartTranditionalComment
           }
           else if(lexicalBuf.findFromLast("//", true)){
             lexicalBuf.clear()
-            state = START_EOL_COMMENT
+            state = StartEolComment
           }
         }
-        case START_TRANDITIONAL_COMMENT =>{
+        case StartTranditionalComment =>{
           if(lexicalBuf.findFromLast("*/", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_EOL_COMMENT => {
+        case StartEolComment => {
           if(lexicalBuf.findFromLast("\r\n", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }else if(lexicalBuf.findFromLast("\n", true)){
             lexicalBuf.trimEnd(1)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_STRING => {
+        case StartString => {
           if(lexicalBuf.findFromLast('"', false)){
-            state = NOP
+            state = Nop
           }
         }
-        case START_RAW_STRING => {
+        case StartRawString => {
           if(lexicalBuf.findFromLast('`', false)){
-            state = NOP
+            state = Nop
           }
         }
       }
@@ -504,64 +528,66 @@ def parseGoType(stream: InputStream): Option[List[Array[Byte]]] =
     * @param stream a stream to parse
     * @return a list of byte arrays
     */
-  def parseJsType(stream: InputStream): Option[List[Array[Byte]]] = {
+  def parseJsType(stream: InputStreamReader): Option[List[Array[Char]]] = {
     //https://www.ecma-international.org/publications/files/ECMA-ST/Ecma-262.pdf
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
-    val START_TRANDITIONAL_COMMENT = 0
-    val START_EOL_COMMENT = 1
-    val START_DOUBLE_STRING = 2
-    val START_SINGLE_STRING = 3
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+    
+    sealed trait JsState
+    case object Nop extends JsState
+    case object StartTranditionalComment extends JsState
+    case object StartEolComment extends JsState
+    case object StartDoubleString extends JsState
+    case object StartSingleString extends JsState
 
-    var state: Int = NOP
+    var state: JsState = Nop
     var currentByte = stream.read() //read a first byte
     while(currentByte != -1){
       //FSM
-      lexicalBuf += currentByte
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(lexicalBuf.findFromLast('"', true)){
-            state = START_DOUBLE_STRING
+            state = StartDoubleString
           }
           else if(lexicalBuf.findFromLast('\'', true)){
-            state = START_SINGLE_STRING
+            state = StartSingleString
           }
           else if(lexicalBuf.findFromLast("/*", true)){
             lexicalBuf.clear()
-            state = START_TRANDITIONAL_COMMENT
+            state = StartTranditionalComment
           }
           else if(lexicalBuf.findFromLast("//", true)){
             lexicalBuf.clear()
-            state = START_EOL_COMMENT
+            state = StartEolComment
           }
         }
-        case START_TRANDITIONAL_COMMENT =>{
+        case StartTranditionalComment =>{
           if(lexicalBuf.findFromLast("*/", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_EOL_COMMENT => {
+        case StartEolComment => {
           if(lexicalBuf.findFromLast("\r\n", true)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }else if(lexicalBuf.findFromLast("\n", true)){
             lexicalBuf.trimEnd(1)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }
         }
-        case START_DOUBLE_STRING => {
+        case StartDoubleString => {
           if(lexicalBuf.findFromLast('"', false)){
-            state = NOP
+            state = Nop
           }
         }
-        case START_SINGLE_STRING => {
+        case StartSingleString => {
           if(lexicalBuf.findFromLast('\'', false)){
-            state = NOP
+            state = Nop
           }
         }
       }
@@ -574,40 +600,42 @@ def parseGoType(stream: InputStream): Option[List[Array[Byte]]] =
     * @param stream a stream to parse
     * @return a list of byte arrays
     */
-  def parseHtmlType(stream: InputStream): Option[List[Array[Byte]]] = {
+  def parseHtmlType(stream: InputStreamReader): Option[List[Array[Char]]] = {
     //https://www.w3.org/TR/html4/intro/sgmltut.html#h-3.2.4
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
-    val START_COMMENT = 0
-    val START_COMMENT_DOUBLE_DASH = 1
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+    
+    sealed trait HtmlState
+    case object Nop extends HtmlState
+    case object StartComment extends HtmlState
+    case object StartCommentDoubleDash extends HtmlState
 
-    var state: Int = NOP
+    var state: HtmlState = Nop
     var currentByte = stream.read() //read a first byte
     while(currentByte != -1){
       //FSM
-      lexicalBuf += currentByte
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(lexicalBuf.findFromLast("<!--", true)){
             lexicalBuf.clear()
-            state = START_COMMENT
+            state = StartComment
           }
         }
-        case START_COMMENT =>{
+        case StartComment =>{
           if(lexicalBuf.findFromLast("--", true)){
-            state = START_COMMENT_DOUBLE_DASH
+            state = StartCommentDoubleDash
           }
         }
-        case START_COMMENT_DOUBLE_DASH => {
+        case StartCommentDoubleDash => {
           if(lexicalBuf.findFromLast(">", true)){
             lexicalBuf.trimEnd(3)
             listBuffer += lexicalBuf.toArray
-            state = NOP
+            state = Nop
           }else if(lexicalBuf.findFromLast(" ", true)){
             lexicalBuf.trimEnd(1)
           }else{
-            state = START_COMMENT
+            state = StartComment
           }
         }
       }
@@ -621,41 +649,42 @@ def parseGoType(stream: InputStream): Option[List[Array[Byte]]] =
     * @param stream a stream to parse
     * @return a list of byte arrays
     */
-  def parseBatType(stream: InputStream): Option[List[Array[Byte]]] = {
-    //
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
-    val START_COMMENT = 0
+  def parseBatType(stream: InputStreamReader): Option[List[Array[Char]]] = {
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+    
+    sealed trait BatState
+    case object Nop extends BatState
+    case object StartComment extends BatState
 
-    var state: Int = NOP
+    var state: BatState = Nop
     var currentByte = stream.read() //read a first byte
     while(currentByte != -1){
       //FSM
-      lexicalBuf += currentByte
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(currentByte == '\n')
             lexicalBuf.clear()
           else if(lexicalBuf.findFromFirstIgnoreCase("rem ")){
             lexicalBuf.clear()
-            state = START_COMMENT
+            state = StartComment
           }
           else if(currentByte == ' ')
             lexicalBuf.trimEnd(1)
         }
-        case START_COMMENT =>{
+        case StartComment =>{
           if(lexicalBuf.findFromLast("\r\n", false)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
           else if(lexicalBuf.findFromLast("\n", false)){
             lexicalBuf.trimEnd(1)
             listBuffer += lexicalBuf.toArray
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
         }
       }
@@ -671,60 +700,61 @@ def parseGoType(stream: InputStream): Option[List[Array[Byte]]] =
     * @param stream a stream to parse
     * @return a list of byte arrays
     */
-  def parseShType(stream: InputStream): Option[List[Array[Byte]]] = {
-
+  def parseShType(stream: InputStreamReader): Option[List[Array[Char]]] = {
     //http://pubs.opengroup.org/onlinepubs/009695399/utilities/xcu_chap02.html
-    val listBuffer = new ListBuffer[Array[Byte]]()
-    val lexicalBuf = new ArrayBuffer[Byte]()
-    val NOP = -1
-    val START_COMMENT = 0
-    val START_STRING_SINGLE = 1
-    val START_STRING_DOUBLE = 2
+    val listBuffer = new ListBuffer[Array[Char]]()
+    val lexicalBuf = new ArrayBuffer[Char]()
+    
+    sealed trait ShState
+    case object Nop extends ShState
+    case object StartComment extends ShState
+    case object StartStringSingle extends ShState
+    case object StartStringDouble extends ShState
 
-    var state: Int = NOP
+    var state: ShState = Nop
     var currentByte = stream.read() //read a first byte
     while(currentByte != -1){
       //FSM
-      lexicalBuf += currentByte
+      lexicalBuf += currentByte.toChar
       state match {
-        case NOP => {
+        case Nop => {
           if(currentByte == '\''){
             lexicalBuf.clear()
-            state = START_STRING_SINGLE
+            state = StartStringSingle
           }
           else if(currentByte == '\"'){
             lexicalBuf.clear()
-            state = START_STRING_DOUBLE
+            state = StartStringDouble
           }
           else if(currentByte == '#'){
             lexicalBuf.clear()
-            state = START_COMMENT
+            state = StartComment
           }
         }
-        case START_STRING_SINGLE => {
+        case StartStringSingle => {
           if(lexicalBuf.findFromLast('\'', false)){
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
         }
-        case START_STRING_DOUBLE =>{
+        case StartStringDouble =>{
           if(lexicalBuf.findFromLast('"', false)){
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
         }
-        case START_COMMENT => {
+        case StartComment => {
           if(lexicalBuf.findFromLast("\r\n", false)){
             lexicalBuf.trimEnd(2)
             listBuffer += lexicalBuf.toArray
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
           else if(lexicalBuf.findFromLast('\n', false)){
             lexicalBuf.trimEnd(1)
             listBuffer += lexicalBuf.toArray
             lexicalBuf.clear()
-            state = NOP
+            state = Nop
           }
         }
       }

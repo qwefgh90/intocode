@@ -16,6 +16,7 @@ import org.mozilla.universalchardet.UniversalDetector
 import io.github.qwefgh90.jsearch._
 
 import com.typesafe.scalalogging._
+import java.io.InputStreamReader
 
 class ExtractorSpec extends FlatSpec with Matchers {
   val logger = Logger(classOf[ExtractorSpec])
@@ -123,67 +124,67 @@ usage:"""))
 
   "Parser" should "return a count of comments we excect" in {
     val javaStream = getClass.getResourceAsStream("/java.java")
-    val javaList = parseJavaType(javaStream)
+    val javaList = parseJavaType(new InputStreamReader(javaStream))
     javaList should not be None
     javaList.get.size shouldEqual 11
     javaStream.close()
 
     val pyStream = getClass.getResourceAsStream("/py.py")
-    val pyList = parsePyType(pyStream)
+    val pyList = parsePyType(new InputStreamReader(pyStream))
     pyList should not be None
     pyList.get.size shouldEqual 11
     pyStream.close()
 
     val cStream = getClass.getResourceAsStream("/c.c")
-    val cList = parseCType(cStream)
+    val cList = parseCType(new InputStreamReader(cStream))
     cList should not be None
     cList.get.size shouldEqual 17
     cStream.close()
     
     val hStream = getClass.getResourceAsStream("/h.h")
-    val hList = parseCType(hStream)
+    val hList = parseCType(new InputStreamReader(hStream))
     hList should not be None
     hList.get.size shouldEqual 7
     hStream.close()
 
     val scalaStream = getClass.getResourceAsStream("/scala.scala")
-    val scalaList = parseScalaType(scalaStream)
+    val scalaList = parseScalaType(new InputStreamReader(scalaStream))
     scalaList should not be None
     scalaList.get.size shouldEqual 13
     scalaStream.close()
 
     val rubyStream = getClass.getResourceAsStream("/rb.rb")
-    val rubyList = parseRubyType(rubyStream)
+    val rubyList = parseRubyType(new InputStreamReader(rubyStream))
     rubyList should not be None
     rubyList.get.size shouldEqual 2
     rubyStream.close()
 
     val goStream = getClass.getResourceAsStream("/go.go")
-    val goList = parseGoType(goStream)
+    val goList = parseGoType(new InputStreamReader(goStream))
     goList should not be None
     goList.get.size shouldEqual 6
     goStream.close()
 
     val jsStream = getClass.getResourceAsStream("/js.js")
-    val jsList = parseJsType(jsStream)
+    val jsList = parseJsType(new InputStreamReader(jsStream))
     jsList should not be None
     jsList.get.size shouldEqual 16
     jsStream.close()
 
     val htmlStream = getClass.getResourceAsStream("/html.html")
-    val htmlList = parseHtmlType(htmlStream)
+    val htmlList = parseHtmlType(new InputStreamReader(htmlStream))
     htmlList should not be None
     htmlList.get.size shouldEqual 9
     htmlStream.close()
 
     val batStream = getClass.getResourceAsStream("/bat.bat")
-    val batList = parseBatType(batStream)
+    val batList = parseBatType(new InputStreamReader(batStream))
     batList should not be None
     batList.get.size shouldEqual 18
     batStream.close()
 
     val shStream = getClass.getResourceAsStream("/sh.sh")
-    val shList = parseShType(shStream)
+    val shList = parseShType(new InputStreamReader(shStream))
     shList should not be None
     shList.get.size shouldEqual 25
     shStream.close()

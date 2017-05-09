@@ -35,8 +35,8 @@ object Boilerplate {
   /**
    * @param stream stream which bytes connect with
    */
-  implicit def streamToArray(stream: InputStream): Array[Byte] = {
-    val buf = new ArrayBuffer[Byte](50000) //50KB
+  implicit def streamToArray(stream: InputStreamReader): Array[Char] = {
+    val buf = new ArrayBuffer[Char](50000) //50KB
     readStream(stream)(buf+=_)
     buf.toArray
   }
@@ -61,10 +61,10 @@ object Boilerplate {
    * 
    * @param stream A stream to read
    */
-  def readStream(stream: InputStream)(op: Byte => Unit) = {
+  def readStream(stream: InputStreamReader)(op: Char => Unit) = {
     var currentByte = stream.read()
     while(currentByte != -1){
-      op(currentByte)
+      op(currentByte.toChar)
       currentByte = stream.read()
     }
   }
