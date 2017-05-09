@@ -23,23 +23,25 @@ object Extractor {
   private val dummy = File.createTempFile("will be deleted", "will be deleted");
   dummy.deleteOnExit()
   
+  case class ExtractResult(startOffset: Int, comment: String, uri: URI)
+  
   /** Extract a list of comments from uri.
     * 
     * @param uri a uri to create stream from
     * @param fileName a file name to detect a media type
     * @return a list of comments
     */
-  def extractComments(uri: URI, fileName: String, charset: Charset = StandardCharsets.UTF_8): Option[List[String]] = {
+  def extractComments(uri: URI, fileName: String, charset: Charset = StandardCharsets.UTF_8): Option[List[ExtractResult]] = {
 	  val tempFile = File.createTempFile("will be deleted", "will be deleted");
   	  tempFile.deleteOnExit()
   	  readUri(uri){is =>
     	  val result = extractComments(is, JSearch.getContentType(tempFile, fileName), charset)
     	  result.map{list => {
-    		  for(byteArray <- list; str = new String(byteArray))
-    			  yield str
+    		  for(comment <- list; str = new String(comment.charArray))
+    			  yield ExtractResult(comment.startOffset, str, uri)
     	  }
   	  }
-		}.asInstanceOf[Option[List[String]]]
+		}.asInstanceOf[Option[List[ExtractResult]]]
   }
 
   /** Extract a list of byte arrays from a stream.
@@ -48,7 +50,7 @@ object Extractor {
     * @param mediaType a media type that decide a parser
     * @return a list of byte arrays
     */
-  private def extractComments(stream: InputStream, mediaType: MediaType, charset: Charset): Option[List[Array[Char]]] = {
+  private def extractComments(stream: InputStream, mediaType: MediaType, charset: Charset): Option[List[CommentResult]] = {
     val streamReader = new InputStreamReader(stream, charset)
     mediaType match {
       case JAVA_TYPE => { 
@@ -89,6 +91,9 @@ object Extractor {
       }
       case SH_TYPE => {
         parseShType(streamReader)
+      }
+      case _ => {
+        Option.empty
       }
 
     }

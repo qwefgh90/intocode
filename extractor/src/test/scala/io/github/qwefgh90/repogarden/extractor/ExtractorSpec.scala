@@ -35,19 +35,30 @@ class ExtractorSpec extends FlatSpec with Matchers {
   "Results of extracting java.java" should "be equal to 5th, 6th comment" in {
     val javaUri = getClass.getResource("/java.java").toURI
     val javaList = extractComments(javaUri, "java.java").get
-    (javaList(5) shouldEqual """*
+    (javaList(5).comment shouldEqual """*
 	 * factory class of <b>TikaMimeXmlObject</b>
 	 * 
 	 * @author choechangwon
 	 *
 	 """) (after being ignoreSpecialChars)
-    (javaList(6) should equal (""" load from property file""")) (after being ignoreSpecialChars)
+    (javaList(6).comment should equal (""" load from property file""")) (after being ignoreSpecialChars)
+    
+    readUri(javaUri)(inputStream => {
+      val body = new String(streamToArray(new InputStreamReader(inputStream)))
+      assert(body.substring(javaList(5).startOffset, javaList(5).startOffset
+          + javaList(5).comment.size) == javaList(5).comment) 
+    })
+    readUri(javaUri)(inputStream => {
+      val body = new String(streamToArray(new InputStreamReader(inputStream)))
+      assert(body.substring(javaList(6).startOffset, javaList(6).startOffset
+          + javaList(6).comment.size) == javaList(6).comment) 
+    })
   }
 
   "Results of extracting py.py" should "be equal to 5th, 6th comment" in {
     val pyUri = getClass.getResource("/py.py").toURI
     val pyList = extractComments(pyUri, "py.py").get
-    (pyList(5) should startWith ("""
+    (pyList(5).comment should startWith ("""
 Requests HTTP library
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -56,69 +67,92 @@ usage:"""))
 
     logger.info(pyList(6).toString)
 
-    (pyList(6).toString should equal (""" Attempt to enable urllib3's SNI support, if possible""")) (after being ignoreSpecialChars)
+    (pyList(6).comment should equal (""" Attempt to enable urllib3's SNI support, if possible""")) (after being ignoreSpecialChars)
+  
+    readUri(pyUri)(inputStream => {
+      val body = new String(streamToArray(new InputStreamReader(inputStream)))
+      assert(body.substring(pyList(5).startOffset, pyList(5).startOffset
+          + pyList(5).comment.size) == pyList(5).comment) 
+    })
+    readUri(pyUri)(inputStream => {
+      val body = new String(streamToArray(new InputStreamReader(inputStream)))
+      assert(body.substring(pyList(5).startOffset, pyList(5).startOffset
+          + pyList(5).comment.size) == pyList(5).comment) 
+    })
   }
 
   "Results of extracting c.c" should "be equal to 14th, 15th comment" in {
     val cUri = getClass.getResource("/c.c").toURI
     val cList = extractComments(cUri, "c.c").get
-    (cList(13) shouldEqual """ Rotate the list removing the tail node and inserting it to the head. """) (after being ignoreSpecialChars)
-    (cList(16) should equal (""" Test a EOF Comment""")) (after being ignoreSpecialChars)
+    (cList(13).comment shouldEqual """ Rotate the list removing the tail node and inserting it to the head. """) (after being ignoreSpecialChars)
+    (cList(16).comment should equal (""" Test a EOF Comment""")) (after being ignoreSpecialChars)
+    
+    readUri(cUri)(inputStream => {
+      val body = new String(streamToArray(new InputStreamReader(inputStream)))
+      assert(body.substring(cList(13).startOffset, cList(13).startOffset
+          + cList(13).comment.size) == cList(13).comment) 
+    })
+    readUri(cUri)(inputStream => {
+      val body = new String(streamToArray(new InputStreamReader(inputStream)))
+      assert(body.substring(cList(16).startOffset, cList(16).startOffset
+          + cList(16).comment.size) == cList(16).comment) 
+    })
   }
+  
   "Results of extracting h.h" should "be equal to 2th, 3th comment" in {
     val hUri = getClass.getResource("/h.h").toURI
     val hList = extractComments(hUri, "h.h").get
-    (hList(1) shouldEqual """This comment is for test """) (after being ignoreSpecialChars)
-    (hList(2) should equal (""" Node, List, and Iterator are the only data structures used currently.""")) (after being ignoreSpecialChars)
+    (hList(1).comment shouldEqual """This comment is for test """) (after being ignoreSpecialChars)
+    (hList(2).comment should equal (""" Node, List, and Iterator are the only data structures used currently.""")) (after being ignoreSpecialChars)
   }
 
   "Results of extracting scala.scala" should "be equal to 1th, 3th comment" in {
     val scalaUri = getClass.getResource("/scala.scala").toURI
     val hList = extractComments(scalaUri, "scala.scala").get
-    (hList(0) shouldEqual """* * Copyright (C) 2009-2017 Lightbend Inc. <http://www.lightbend.com> """) (after being ignoreSpecialChars)
-    (hList(12) should equal ("""look at you""")) (after being ignoreSpecialChars)
+    (hList(0).comment shouldEqual """* * Copyright (C) 2009-2017 Lightbend Inc. <http://www.lightbend.com> """) (after being ignoreSpecialChars)
+    (hList(12).comment should equal ("""look at you""")) (after being ignoreSpecialChars)
   }
 
   "Results of extracting rb.rb" should "be equal to 1th, 2th comment" in {
     val rbUri = getClass.getResource("/rb.rb").toURI
     val rbList = extractComments(rbUri, "rb.rb").get
-    (rbList(0) shouldEqual """ Returns the version of the currently loaded Rails as a <tt>Gem::Version</tt> """) (after being ignoreSpecialChars)
-    (rbList(1) should equal ("""can you see it? mutiline comment""")) (after being ignoreSpecialChars)
+    (rbList(0).comment shouldEqual """ Returns the version of the currently loaded Rails as a <tt>Gem::Version</tt> """) (after being ignoreSpecialChars)
+    (rbList(1).comment should equal ("""can you see it? mutiline comment""")) (after being ignoreSpecialChars)
   }
 
   "Results of extracting go.go" should "be equal to 5th, 6th comment" in {
     val goUri = getClass.getResource("/go.go").toURI
     val goList = extractComments(goUri, "go.go").get
-    (goList(4) shouldEqual """ e.g. it matches what we generate with Sign() """) (after being ignoreSpecialChars)
-    (goList(5) should equal (""" It's a traditional comment.It's a traditional comment.""")) (after being ignoreSpecialChars)
+    (goList(4).comment shouldEqual """ e.g. it matches what we generate with Sign() """) (after being ignoreSpecialChars)
+    (goList(5).comment should equal (""" It's a traditional comment.It's a traditional comment.""")) (after being ignoreSpecialChars)
   }
 
   "Results of extracting js.js" should "be equal to 1th, 16th comment" in {
     val jsUri = getClass.getResource("/js.js").toURI
     val jsList = extractComments(jsUri, "js.js").get
-    (jsList(0) shouldEqual """eslint-disable no-unused-vars""") (after being ignoreSpecialChars)
-    (jsList(15) should equal ("""  build.js inserts compiled jQuery here""")) (after being ignoreSpecialChars)
+    (jsList(0).comment shouldEqual """eslint-disable no-unused-vars""") (after being ignoreSpecialChars)
+    (jsList(15).comment should equal ("""  build.js inserts compiled jQuery here""")) (after being ignoreSpecialChars)
   }
 
   "Results of extracting html.html" should "be equal to 1th, 2th comment" in {
     val htmlUri = getClass.getResource("/html.html").toURI
     val htmlList = extractComments(htmlUri, "html.html").get
-    (htmlList(0) shouldEqual """<script type='text/javascript' src='http://getfirebug.com/releases/lite/1.2/firebug-lite-compressed.js'></script>""") (after being ignoreSpecialChars)
-    (htmlList(1) should equal (""" app title """)) (after being ignoreSpecialChars)
+    (htmlList(0).comment shouldEqual """<script type='text/javascript' src='http://getfirebug.com/releases/lite/1.2/firebug-lite-compressed.js'></script>""") (after being ignoreSpecialChars)
+    (htmlList(1).comment should equal (""" app title """)) (after being ignoreSpecialChars)
   }
 
   "Results of extracting bat.bat" should "be equal to 1th, 18th comment" in {
     val batUri = getClass.getResource("/bat.bat").toURI
     val batList = extractComments(batUri, "bat.bat").get
-    (batList(0) shouldEqual """Licensed to the Apache Software Foundation (ASF) under one or more""") (after being ignoreSpecialChars)
-    (batList(17) should equal ("""Get remaining unshifted command line arguments and save them in the""")) (after being ignoreSpecialChars)
+    (batList(0).comment shouldEqual """Licensed to the Apache Software Foundation (ASF) under one or more""") (after being ignoreSpecialChars)
+    (batList(17).comment should equal ("""Get remaining unshifted command line arguments and save them in the""")) (after being ignoreSpecialChars)
   }
 
   "Results of extracting sh.sh" should "be equal to 1th, 22th comment" in {
     val shUri = getClass.getResource("/sh.sh").toURI
     val shList = extractComments(shUri, "sh.sh").get
-    (shList(0) shouldEqual """!/bin/sh""") (after being ignoreSpecialChars)
-    (shList(21) should equal (""" -x will Only work on the os400 if the files are:""")) (after being ignoreSpecialChars)
+    (shList(0).comment shouldEqual """!/bin/sh""") (after being ignoreSpecialChars)
+    (shList(21).comment should equal (""" -x will Only work on the os400 if the files are:""")) (after being ignoreSpecialChars)
   }
 
 

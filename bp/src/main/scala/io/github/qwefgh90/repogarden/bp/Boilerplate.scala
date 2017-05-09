@@ -57,7 +57,7 @@ object Boilerplate {
   }
 
   /**
-   * Read all bytes from stream
+   * Read all bytes from stream and don't close it.
    * 
    * @param stream A stream to read
    */
@@ -70,7 +70,7 @@ object Boilerplate {
   }
   
   /**
-   * Process uri as inputStream
+   * Process uri as inputStream and close it.
    * 
    * @param uri a uri to be converted to stream
    * @return A return value of process
@@ -89,12 +89,16 @@ object Boilerplate {
       case `httpsScheme` => {
         val url = uri.toURL
         val is = url.openStream()
-        process(is)
+        autoClose(is){is =>
+          process(is)
+        }
       }
       case `httpScheme` => {
         val url = uri.toURL
         val is = url.openStream()
-       process(is)
+        autoClose(is){is =>
+          process(is)
+        }
       }
       case _ => {
         //can't handle it
