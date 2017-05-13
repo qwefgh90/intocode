@@ -29,6 +29,7 @@ object Extractor {
     * 
     * @param uri a uri to create stream from
     * @param fileName a file name to detect a media type
+    * @param charset a character encoding of this file
     * @return a list of comments
     */
   def extractComments(uri: URI, fileName: String, charset: Charset = StandardCharsets.UTF_8): Option[List[ExtractResult]] = {
