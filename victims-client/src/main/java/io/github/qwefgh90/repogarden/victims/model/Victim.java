@@ -2,8 +2,6 @@ package io.github.qwefgh90.repogarden.victims.model;
 
 import java.util.List;
 
-
-
 /**
  * A java model for victims-cve-db
  * https://github.com/victims/victims-cve-db

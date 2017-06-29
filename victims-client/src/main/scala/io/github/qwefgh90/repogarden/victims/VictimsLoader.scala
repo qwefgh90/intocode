@@ -72,7 +72,7 @@ class VictimsLoader(oauthToken: Option[String]) {
 	    if(lastCommit == null || lastRemoteCommit.getCommit.getCommitter.getDate
 	        .after(lastCommit.getCommit.getCommitter.getDate)){
 	    	lastCommit = lastRemoteCommit
-	    	val repositoryContentList = contentService.getFiles(repository, "database/java", "heads/master", true)
+	    	val repositoryContentList = contentService.getContents(repository, "database/java", "heads/master", true)
 	    	repositoryContentList.foreach(repositoryContent => {
           repositoryContent.setContent(repositoryContent.getContentSync(repository, dataService))
 	    	})
@@ -86,7 +86,7 @@ class VictimsLoader(oauthToken: Option[String]) {
 		  throw new RuntimeException("The iterator of first commits page must have more items than zero") 
 	}
 	
-	case class VulnerablePart(vulnerableVersionList: List[Option[String]], relatedJavaModule: JavaModule, relatedCve: Victim)
+	case class VulnerablePart(vulnerableVersionList: List[String], relatedJavaModule: JavaModule, relatedCve: Victim)
 	case class VulnerableResult(vulerableList: List[VulnerablePart])
 	
 	/** Return a vulnerable list wrapped by Option if related vulnerables exists.
@@ -97,11 +97,10 @@ class VictimsLoader(oauthToken: Option[String]) {
 	  val key = groupId + "%" + artifactId
 	  if(cveMap.contains(key)){
 	    val affectedArtifactList = cveMap(key)
-	    val resultTuple = affectedArtifactList.map(artifact => {
+	    val vulerableList = affectedArtifactList.map(artifact => {
 	      val affectedVersionList = artifact._1.getVersion
-	      val resultListForEachVersion = affectedVersionList.asScala.map(versionSet => {
-	        val splitedVersion = versionSet.split(",")
-	        val isVulnerable = splitedVersion.toList match {
+	      val issueVersionList = affectedVersionList.asScala.map(versionSet => {
+	        val isVulnerable = versionSet.split(",").toList match {
 	          case List(affectedVersion) => {
 	            val operator = affectedVersion.substring(0, affectedVersion.indexOf("=") + 1)
 	            val parsedVersion = affectedVersion.substring(affectedVersion.indexOf("=") + 1)
@@ -109,7 +108,7 @@ class VictimsLoader(oauthToken: Option[String]) {
 	              case "<=" => version.toVersion <= parsedVersion.toVersion
 	              case "==" => version.toVersion == parsedVersion.toVersion
 	              case ">=" => version.toVersion >= parsedVersion.toVersion
-	              case _ => throw new RuntimeException("It's invalid operator")
+	              case str => throw new RuntimeException("It's invalid operator : " + str)
 	            }
 	          }
 	          case List(affectedVersion,series) => {
@@ -119,20 +118,25 @@ class VictimsLoader(oauthToken: Option[String]) {
 	              case "<=" => version.startsWith(series) && version.toVersion <= parsedVersion.toVersion
 	              case "==" => version.startsWith(series) && version.toVersion == parsedVersion.toVersion
 	              case ">=" => version.startsWith(series) && version.toVersion >= parsedVersion.toVersion
-	              case _ => throw new RuntimeException("It's invalid operator")
+	              case str  => throw new RuntimeException("It's invalid operator : " + str)
 	            }
 	          }
-	          case _ =>
-	            throw new RuntimeException("It's invalid version format")
+	          case str =>
+	            throw new RuntimeException("It's invalid version format : " + str)
 	        }
+	        
 	        if(isVulnerable)
 	          Option(versionSet)
 	        else
 	        	Option.empty
-	      })
-	      VulnerablePart(resultListForEachVersion.filter(versionOpt => versionOpt.isDefined).toList, artifact._1, artifact._2)
+	        	
+	      }).filter(versionOpt => versionOpt.isDefined)
+	        .map(versionOpt => versionOpt.get).toList
+	      
+	      VulnerablePart(issueVersionList, artifact._1, artifact._2)
 	    }).filter(part => part.vulnerableVersionList.size > 0)
-	    val vulnerableResult = VulnerableResult(resultTuple)
+	    
+	    val vulnerableResult = VulnerableResult(vulerableList)
 	    if(vulnerableResult.vulerableList.isEmpty)
 	      Option.empty
 	    else

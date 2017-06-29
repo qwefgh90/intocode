@@ -8,19 +8,32 @@ import java.util.Base64
 import scala.concurrent.Future
 import scala.util.Try
 
+import com.typesafe.scalalogging._
+
 object Implicits {
 	class ContentsServiceEx(contentsService: ContentsService){
+    private val logger = Logger(classOf[ContentsServiceEx])
 	  /**
 	   * @param repoProvider repository provider
 	   * @param path if path is null, iterate contents from root. Otherwise, iterate contents from path
 	   * @param recursive whether to iterate all sub directories
-	   * @return a list of contents     
+	   * @return a list of contents
 	   */
-		def getFiles(repoProvider: IRepositoryIdProvider, path: String, ref: String, recursive: Boolean): List[RepositoryContents] = {
+		def getContents(repoProvider: IRepositoryIdProvider, path: String, ref: String, recursive: Boolean): List[RepositoryContents] = {
 			val contentList = contentsService.getContents(repoProvider, path, ref).asScala.toList
 			contentList.flatMap{content => 
 			  if(content.getType == RepositoryContents.TYPE_DIR && recursive == true) 
-			    getFiles(repoProvider, content.getPath, ref, true) 
+			    getContents(repoProvider, content.getPath, ref, true) 
+			  else 
+			    List(content) 
+			}
+		}
+    
+		def getContents(repoProvider: IRepositoryIdProvider, path: String, ref: String, recursive: Boolean, containingTree: Boolean): List[RepositoryContents] = {
+			val contentList = contentsService.getContents(repoProvider, path, ref).asScala.toList
+			contentList.flatMap{content => 
+			  if(content.getType == RepositoryContents.TYPE_DIR && recursive == true) 
+			    content :: getContents(repoProvider, content.getPath, ref, true)
 			  else 
 			    List(content) 
 			}

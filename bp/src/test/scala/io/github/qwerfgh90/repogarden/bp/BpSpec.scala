@@ -4,9 +4,40 @@ import org.scalatest.Matchers
 import org.scalatest.FlatSpec
 import com.typesafe.scalalogging.Logger
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
+import scala.collection.JavaConverters._
+
+import org.eclipse.egit.github.core.client._
+import org.eclipse.egit.github.core.service._
 
 class BpSpec extends FlatSpec with Matchers{
   private val logger = Logger(classOf[BpSpec])
+  
+	private lazy val client = {
+	val oauthToken = System.getProperties.getProperty("oauthToken")
+	val oauthTokenOpt = if(oauthToken == null)
+	  Option.empty
+	else
+	  Option(oauthToken)
+	  
+	val githubClient = new GitHubClient()
+	if(oauthTokenOpt.isDefined){
+			githubClient.setOAuth2Token(oauthTokenOpt.get)
+	  }
+	  githubClient
+	}
+  
+  "Github api" should "get trees of commits" in {    
+		val contentService = new ContentsService(client)
+		val repositoryService = new RepositoryService(client)
+		val commitService = new CommitService(client)
+    val repository = repositoryService.getRepository("qwefgh90", "repogarden-web")
+		val initialList = contentService.getContents(repository, "", "ed6a96f07855cd4ec3317dde8721a6f981c9d24a", true)
+		assert(initialList.length == 1)
+    val otherRepository = repositoryService.getRepository("reactivemanifesto", "reactivemanifesto")
+		val list2 = contentService.getContents(otherRepository, "", "8f758d46ae201886098b80dc0eab0c484305cd8e", true, true)
+		assert(list2.length == 27)
+		list2.foreach(content => { logger.debug(s"${content.getType} : ${content.getPath} ") })
+  }
   
   "A version string" should "be correctly compared with other version string" in {
     val version0 = "1"

@@ -33,6 +33,7 @@ class VictimsSpec extends FlatSpec with Matchers{
     val constructor = new Constructor(classOf[Victim]);//Car.class is root
     val yaml = new Yaml(constructor);
     VictimsLoader(systemTokenOpt).getLatestCveList.foreach(repositoryContent => {
+      logger.debug(repositoryContent._1.getPath)
       val content: String = repositoryContent._1.getContent
     	val victim = yaml.load(content).asInstanceOf[Victim]
     	assert(victim.getTitle != null && victim.getTitle.length() > 0)
@@ -76,21 +77,22 @@ class VictimsSpec extends FlatSpec with Matchers{
   
   //https://github.com/victims/victims-cve-db/blob/master/database/java/2016/3092.yaml
   "A VictimsLoader" should "scan a vulnerable package" in {
-    val resultOpt = VictimsLoader(systemTokenOpt).scanSingleArtifact("org.apache.tomcat", "tomcat-catalina", "8.0.33")
+    val victimLoader = VictimsLoader(systemTokenOpt);
+    val resultOpt = victimLoader.scanSingleArtifact("org.apache.tomcat", "tomcat-catalina", "8.0.33")
     assert(resultOpt.isDefined)
     assert(resultOpt.get.vulerableList.size == 1)
-    val resultOpt2 = VictimsLoader(systemTokenOpt).scanSingleArtifact("org.apache.tomcat", "tomcat-catalina", "8.0.35")
+    val resultOpt2 = victimLoader.scanSingleArtifact("org.apache.tomcat", "tomcat-catalina", "8.0.35")
     assert(resultOpt2.isDefined)
     assert(resultOpt2.get.vulerableList.size == 1)
-    val resultOpt3 = VictimsLoader(systemTokenOpt).scanSingleArtifact("org.apache.tomcat", "tomcat-catalina", "8.0.36")
+    val resultOpt3 = victimLoader.scanSingleArtifact("org.apache.tomcat", "tomcat-catalina", "8.0.36")
     assert(resultOpt3.isEmpty)
-    val resultOpt4 = VictimsLoader(systemTokenOpt).scanSingleArtifact("commons-fileupload", "commons-fileupload", "1.3.2")
-    assert(resultOpt4.isEmpty)
-    val resultOpt5 = VictimsLoader(systemTokenOpt).scanSingleArtifact("commons-fileupload", "commons-fileupload", "1.3.1-jenkins-1")
+    val resultOpt4 = victimLoader.scanSingleArtifact("commons-fileupload", "commons-fileupload", "1.3.2")
+    assert(resultOpt4.isDefined)
+    val resultOpt5 = victimLoader.scanSingleArtifact("commons-fileupload", "commons-fileupload", "1.3.1-jenkins-1")
     assert(resultOpt5.isDefined)
-    assert(resultOpt5.get.vulerableList.size == 1)
-    val resultOpt6 = VictimsLoader(systemTokenOpt).scanSingleArtifact("commons-fileupload", "commons-fileupload", "1.3")
+    assert(resultOpt5.get.vulerableList.size == 4)
+    val resultOpt6 = victimLoader.scanSingleArtifact("commons-fileupload", "commons-fileupload", "1.3")
     assert(resultOpt6.isDefined)
-    assert(resultOpt6.get.vulerableList.size == 1)
+    assert(resultOpt6.get.vulerableList.size == 4)
   }
 }
