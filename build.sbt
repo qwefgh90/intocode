@@ -26,7 +26,10 @@ lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(extra
     commonSettings,
     version := "0.1.0-SNAPSHOT",
     name := "web",
-    libraryDependencies += filters
+    libraryDependencies += filters,
+  	libraryDependencies += "io.jsonwebtoken" % "jjwt" % "0.7.0",
+  	libraryDependencies += ws
+
   )
 
 lazy val victims_client = (project in file("victims-client")).dependsOn(bp).
