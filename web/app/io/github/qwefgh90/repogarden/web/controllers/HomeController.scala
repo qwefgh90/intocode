@@ -1,4 +1,4 @@
-package controllers
+package io.github.qwefgh90.repogarden.web.controllers
 
 import javax.inject._
 import play.api._
@@ -19,6 +19,6 @@ class HomeController @Inject() extends Controller {
    * a path of `/`.
    */
   def index = Action { implicit request =>
-    Ok(views.html.index())
+    Ok(io.github.qwefgh90.repogarden.web.views.html.index())
   }
 }

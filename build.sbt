@@ -21,7 +21,7 @@ lazy val extractor = (project in file("extractor")).dependsOn(bp).
     libraryDependencies += "org.languagetool" % "languagetool" % "2.0.1"
   )
 
-lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(extractor).
+lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(bp).dependsOn(extractor).
   settings(
     commonSettings,
     version := "0.1.0-SNAPSHOT",

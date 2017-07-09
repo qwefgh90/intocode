@@ -1,4 +1,4 @@
-package controllers
+package io.github.qwefgh90.repogarden.web.controllers
 
 import javax.inject._
 import play.api._
@@ -6,8 +6,8 @@ import play.api.mvc._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 
-import model._
-import model.Implicits._
+import io.github.qwefgh90.repogarden.web.model._
+import io.github.qwefgh90.repogarden.web.model.Implicits._
 
 @Singleton
 class AuthController @Inject() extends Controller {

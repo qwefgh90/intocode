@@ -1,18 +1,15 @@
-package controllers
+package io.github.qwefgh90.repogarden.web.test
 
 import org.scalatestplus.play._
 import org.scalatestplus.play.guice._
 import org.scalatest._
-import play.api.inject.guice.GuiceBuilder
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test._
 import play.api.test.Helpers._
 import java.io._
 import play.api.Mode
-import util._
-import play.api.Logger
+import io.github.qwefgh90.repogarden.web.service._
 import java.util.Base64
-//mock service
 import play.api.mvc._
 import play.core.server.Server
 import scala.concurrent.Await
@@ -20,6 +17,8 @@ import scala.concurrent.duration._
 import play.api.libs.json._
 import play.api.Configuration
 import scala.concurrent._
+import play.api.libs.json.Json.toJsFieldJsValueWrapper
+import play.api.routing.sird.UrlContext
 
 
 /**
@@ -65,7 +64,7 @@ class HomeControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
       assert(authService.getState.length > 0)
     }
   }
-
+/*
   "HomeController GET" should {
 
     "render the index page from a new instance of controller" in {
@@ -85,7 +84,7 @@ class HomeControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
       contentType(home) mustBe Some("text/html")
       contentAsString(home) must include ("Welcome to Play")
     }
-/*
+
     "render the index page from the router" in {
       // Need to specify Host header to get through AllowedHostsFilter
       val request = FakeRequest(GET, "/").withHeaders("Host" -> "localhost")
@@ -94,6 +93,6 @@ class HomeControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
       status(home) mustBe OK
       contentType(home) mustBe Some("text/html")
       contentAsString(home) must include ("Welcome to Play")
-    }*/
-  }
+    }
+  }*/
 }

@@ -186,19 +186,6 @@ class VictimsLoader(oauthToken: Option[String]) {
 	  }).filter(_.nonEmpty).map(_.get)
 	  Success(vulnerableList)
   } */
-
-	private[victims] def getContent(repositoryContent: RepositoryContents, dataService: DataService) = {
-	  val sha: String = repositoryContent.getSha
-	  val blob = dataService.getBlob(repository, sha)
-	  val encoding = repositoryContent.getEncoding
-    val content: String = blob.getEncoding match {
-    	case Blob.ENCODING_BASE64 => 
-    	  if(encoding == null) new String(Base64.getMimeDecoder.decode(blob.getContent))
-    	  else new String(Base64.getMimeDecoder.decode(blob.getContent), encoding)
-      case Blob.ENCODING_UTF8 => blob.getContent
-	  }
-	  content
-	}
 	
 	private def getAllTreeEntryFromHash(sha: String): List[TreeEntry] = {
 			val tree = dataService.getTree(repository, sha)

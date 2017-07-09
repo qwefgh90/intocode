@@ -1,4 +1,4 @@
-package util
+package io.github.qwefgh90.repogarden.web.service
 
 import org.eclipse.egit.github.core.service._
 import play.api.Configuration

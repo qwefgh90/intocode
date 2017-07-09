@@ -24,6 +24,9 @@ class VictimsSpec extends FlatSpec with Matchers{
 	  Option.empty
 	else
 	  Option(systemToken)
+	  
+	require(systemTokenOpt.isDefined)
+	  
   "A victims loader" should "load some files having cve" in {
     assert(VictimsLoader(systemTokenOpt).getFirstPageIteratorOfCommits.size() > 0)
     assert(VictimsLoader(systemTokenOpt).getLatestCveList.size > 20)
