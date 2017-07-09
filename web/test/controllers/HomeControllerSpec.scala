@@ -12,6 +12,15 @@ import play.api.Mode
 import util._
 import play.api.Logger
 import java.util.Base64
+//mock service
+import play.api.mvc._
+import play.core.server.Server
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import play.api.libs.json._
+import play.api.Configuration
+import scala.concurrent._
+
 
 /**
  * Add your spec here.
@@ -27,6 +36,25 @@ class HomeControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
 
 	val encryption = application.injector.instanceOf[Encryption]
 	val authService = application.injector.instanceOf[AuthService]
+	val configuration = application.injector.instanceOf[Configuration]
+	val context = application.injector.instanceOf[ExecutionContext]
+	
+	"AuthService" should {
+	  "return access token" in {
+	    import play.api.routing.sird._
+	    Server.withRouter() {
+        case play.api.routing.sird.POST(p"/login/oauth/access_token") => Action {
+          Results.Ok(Json.obj("access_token" -> "fake token","token_type" -> "type"))
+        }
+      } { implicit port => 
+        WsTestClient.withClient { clientToMock =>
+          val authService = new AuthService(configuration, encryption, clientToMock, context, "")
+          val result = Await.result(authService.getAccessToken("code", "state", "clientId"), 10.seconds)
+          assert(result.equals("fake token"))
+        }
+      }
+	  }
+	}
 	
   "Encryption" should {
     "encrypt plain text and then decrypt" in {
@@ -57,7 +85,7 @@ class HomeControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
       contentType(home) mustBe Some("text/html")
       contentAsString(home) must include ("Welcome to Play")
     }
-
+/*
     "render the index page from the router" in {
       // Need to specify Host header to get through AllowedHostsFilter
       val request = FakeRequest(GET, "/").withHeaders("Host" -> "localhost")
@@ -66,6 +94,6 @@ class HomeControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
       status(home) mustBe OK
       contentType(home) mustBe Some("text/html")
       contentAsString(home) must include ("Welcome to Play")
-    }
+    }*/
   }
 }

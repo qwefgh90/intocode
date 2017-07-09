@@ -13,16 +13,20 @@ import scala.concurrent._
 import play.api.libs.json._
 import play.api.libs.json.Reads._
 import play.api.libs.functional.syntax._
+import play.Logger
 
 /**
  * 
  */
 @Singleton
-class AuthService @Inject() (configuration: Configuration, encryption: Encryption, ws: WSClient, context: ExecutionContext) {
+class AuthService (configuration: Configuration, encryption: Encryption, ws: WSClient, context: ExecutionContext, baseOAuthBaseUrl: String) {
+  @Inject def this(configuration: Configuration, encryption: Encryption, ws: WSClient, context: ExecutionContext)
+    = this(configuration, encryption, ws, context, configuration.getString("play.baseOAuthBaseUrl").getOrElse("https://github.com"))
+  
   private val clientId = configuration.getString("play.clientId")
   require(clientId.nonEmpty)
-  private val accessTokenUrl = configuration.getString("play.accessTokenUrl")
-  require(accessTokenUrl.nonEmpty)
+  private val accessTokenPath = configuration.getString("play.accessTokenPath")
+  require(accessTokenPath.nonEmpty)
   private val clientSecret = configuration.getString("play.clientSecret")
   require(clientSecret.nonEmpty)
   
@@ -40,13 +44,15 @@ class AuthService @Inject() (configuration: Configuration, encryption: Encryptio
   def getClientId: String = clientId.get
   
   def getAccessToken(code: String, state: String, clientId: String): Future[String] = {
-    val response: Future[WSResponse] = ws.url(accessTokenUrl.get)
+    val response: Future[WSResponse] = ws.url(baseOAuthBaseUrl + accessTokenPath.get)
       .withHeaders("Accept" -> "application/json")
       .post(Map("client_id" -> Seq(clientId)
         , "client_secret" -> Seq(clientSecret.get)
         , "code" -> Seq(code)
         , "state" -> Seq(state)))
-    val tokenFuture = response.map(response => response.json.as[AccessToken]
+         
+    val tokenFuture = response.map(response => {
+      response.json.as[AccessToken]}
     )(context)
     
     return tokenFuture.map(_.token)(context)
