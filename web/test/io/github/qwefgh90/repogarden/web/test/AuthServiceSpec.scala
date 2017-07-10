@@ -27,7 +27,7 @@ import play.api.routing.sird.UrlContext
  *
  * For more information, see https://www.playframework.com/documentation/latest/ScalaTestingWithScalaTest
  */
-class HomeControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
+class AuthServiceSpec extends PlaySpec with GuiceOneAppPerSuite  {
 	val application = new GuiceApplicationBuilder()
 			.in(new File("application.conf"))
 			.in(Mode.Test)
@@ -64,6 +64,7 @@ class HomeControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
       assert(authService.getState.length > 0)
     }
   }
+  
 /*
   "HomeController GET" should {
 

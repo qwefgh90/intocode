@@ -8,4 +8,10 @@ object Implicits {
       "state" -> vec.state
     )
   }
+  
+  implicit val userInformationWrites = new Writes[UserInformation] {
+    def writes(user: UserInformation) = Json.obj(
+     "userId" -> user.userId   
+    )
+  }
 }

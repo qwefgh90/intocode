@@ -24,11 +24,9 @@ class GithubService (accessToken: String) {
   private lazy val user = {
     userService.getUser
   }
-  
   def getAllRepositories = {
     repoService.getRepositories.asScala
   }
-  
   def getUser = {
     user
   }
