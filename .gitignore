@@ -69,3 +69,8 @@ local.properties
 .cache-main
 .scala_dependencies
 .worksheet
+
+# Ensime specific
+.ensime
+.ensime_cache/
+.ensime_lucene/

@@ -42,7 +42,8 @@ lazy val victims_client = (project in file("victims-client")).dependsOn(bp).
     version := "0.1.0-SNAPSHOT",
     name := "victims-client",
     libraryDependencies += "org.yaml" % "snakeyaml" % "1.18",
-    libraryDependencies += "org.apache.maven" % "maven-model" % "3.3.9"
+    libraryDependencies += "org.apache.maven" % "maven-model" % "3.3.9",
+    libraryDependencies += "org.sonatype.aether" % "aether-api" % "1.13.1"
   )
 
 lazy val bp = (project in file("bp")).
@@ -52,3 +53,6 @@ lazy val bp = (project in file("bp")).
     name := "bp",
     libraryDependencies += "com.googlecode.juniversalchardet" % "juniversalchardet" % "1.0.3"
   )
+
+//
+//
