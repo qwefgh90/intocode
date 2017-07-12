@@ -2,6 +2,7 @@ package io.github.qwefgh90.repogarden.victims
 
 import scala.io._
 import scala.collection.JavaConverters._
+import org.apache.maven.model.building._
 import java.io.File
 import java.nio.file._
 
@@ -20,15 +21,29 @@ import scala.concurrent.duration.Duration
 import java.io.File
 import java.util.Arrays
 
-import org.sonatype.aether.RepositorySystem
-import org.sonatype.aether.RepositorySystemSession
-import org.sonatype.aether.artifact.Artifact
-import org.sonatype.aether.graph.Dependency
-import org.sonatype.aether.repository.RemoteRepository
-import org.sonatype.aether.resolution.ArtifactDescriptorRequest
-import org.sonatype.aether.resolution.ArtifactDescriptorResult
-import org.sonatype.aether.util.artifact.DefaultArtifact
-import io.github.qwefgh90.repogarden.victims.util
+import org.eclipse.aether.RepositorySystem;
+import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.aether.collection.CollectRequest;
+import org.eclipse.aether.collection.CollectResult;
+import io.github.qwefgh90.repogarden.victims.util.Booter;
+import io.github.qwefgh90.repogarden.victims.util.ConsoleDependencyGraphDumper;
+
+import org.eclipse.aether.graph._
+import org.eclipse.aether.util.artifact.SubArtifact;
+import org.eclipse.aether.DefaultRepositorySystemSession;
+import org.eclipse.aether.RepositorySystem;
+import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.aether.collection.CollectRequest;
+import org.eclipse.aether.collection.CollectResult;
+import io.github.qwefgh90.repogarden.victims.util.Booter;
+import io.github.qwefgh90.repogarden.victims.util.ConsoleDependencyGraphDumper;
+import org.eclipse.aether.resolution.ArtifactDescriptorRequest;
+import org.eclipse.aether.resolution.ArtifactDescriptorResult;
+import org.eclipse.aether.util.graph.manager.DependencyManagerUtils;
+import org.eclipse.aether.util.graph.transformer.ConflictResolver;
 
 
 class VictimsSpec extends FlatSpec with Matchers{
@@ -98,24 +113,48 @@ class VictimsSpec extends FlatSpec with Matchers{
     System.out.println( "------------------------------------------------------------" );
 
     val system = Booter.newRepositorySystem();
+
     val session = Booter.newRepositorySystemSession( system );
 
-    val artifact = new DefaultArtifact( "org.sonatype.aether:aether-impl:1.9" );
+    session.setConfigProperty( ConflictResolver.CONFIG_PROP_VERBOSE, true );
+    session.setConfigProperty( DependencyManagerUtils.CONFIG_PROP_VERBOSE, true );
 
-    val repo = Booter.newCentralRepository();
+   // val artifact = new DefaultArtifact( "org.apache.maven:maven-aether-provider:3.1.0" );
+//   val artifact = new DefaultArtifact( "io.github.qwefgh90:jsearch:0.3.0" );
 
+//    val pomArtifact = new SubArtifact( artifact, "", "pom" );
+//    pomArtifact.setFile(new File(getClass().getResource("/pom.xml").toURI))
+/*
     val descriptorRequest = new ArtifactDescriptorRequest();
     descriptorRequest.setArtifact( artifact );
-    descriptorRequest.addRepository( repo );
-
+    descriptorRequest.setRepositories( Booter.newRepositories( system, session ) );
     val descriptorResult = system.readArtifactDescriptor( session, descriptorRequest );
+*/
 
-    val iter = descriptorResult.getDependencies().iterator
-    while(iter.hasNext)
-    {
-      System.out.println( iter.next );
-    }
+    val testartifact = new DefaultArtifact( "io.github.qwefgh90xxxxx:jsearchxxx:0.3.0" );
+	val modelBuilder = new DefaultModelBuilderFactory().newInstance();
 
+    val pomFile = new File(getClass().getResource("/pom.xml").toURI)
+    val modelRequest = new DefaultModelBuildingRequest()
+    modelRequest.setPomFile(pomFile)
+    val modelBuildingResult = modelBuilder.build(modelRequest)
+    val mavenDependencies = modelBuildingResult.getRawModel().getDependencies()
+
+    val dp = mavenDependencies.asScala.map(md =>{
+      val dependency = new org.eclipse.aether.graph.Dependency(new DefaultArtifact(md.getGroupId, md.getArtifactId, md.getClassifier, md.getType, md.getVersion), md.getScope)
+      dependency
+    })
+
+    val collectRequest = new CollectRequest();
+    collectRequest.setRootArtifact( testartifact );
+    //    collectRequest.setDependencies( descriptorResult.getDependencies() );
+    collectRequest.setDependencies(dp.asJava);
+    //    collectRequest.setManagedDependencies(dp.asJava);
+    collectRequest.setRepositories( Booter.newRepositories( system, session ) );
+
+    val collectResult = system.collectDependencies( session, collectRequest );
+    
+    collectResult.getRoot().accept( new ConsoleDependencyGraphDumper() );
   }
   
   //https://github.com/victims/victims-cve-db/blob/master/database/java/2016/3092.yaml

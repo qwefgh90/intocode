@@ -33,7 +33,6 @@ lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(bp).d
     libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.0",
     libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1",
     libraryDependencies += "com.typesafe.play" %% "play-iteratees-reactive-streams" % "2.6.1"
-
   )
 
 lazy val victims_client = (project in file("victims-client")).dependsOn(bp).
@@ -43,7 +42,11 @@ lazy val victims_client = (project in file("victims-client")).dependsOn(bp).
     name := "victims-client",
     libraryDependencies += "org.yaml" % "snakeyaml" % "1.18",
     libraryDependencies += "org.apache.maven" % "maven-model" % "3.3.9",
-    libraryDependencies += "org.sonatype.aether" % "aether-api" % "1.13.1"
+    libraryDependencies += "org.eclipse.aether" % "aether-connector-basic" % "1.1.0",
+    libraryDependencies += "org.apache.maven" % "maven-aether-provider" % "3.3.9",
+    libraryDependencies += "org.eclipse.aether" % "aether-transport-file" % "1.1.0",
+    libraryDependencies += "org.eclipse.aether" % "aether-transport-http" % "1.1.0",
+    libraryDependencies += "org.apache.maven" % "maven-model" % "3.5.0"
   )
 
 lazy val bp = (project in file("bp")).
