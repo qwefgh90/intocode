@@ -138,10 +138,12 @@ class VictimsSpec extends FlatSpec with Matchers{
     val modelRequest = new DefaultModelBuildingRequest()
     modelRequest.setPomFile(pomFile)
     val modelBuildingResult = modelBuilder.build(modelRequest)
-    val mavenDependencies = modelBuildingResult.getRawModel().getDependencies()
+    val mavenDependencies = modelBuildingResult.getEffectiveModel.getDependencies()
 
-    val dp = mavenDependencies.asScala.map(md =>{
+    val dp = mavenDependencies.asScala.filter({md => md.getScope == md.getScope}).map(md =>{
       val dependency = new org.eclipse.aether.graph.Dependency(new DefaultArtifact(md.getGroupId, md.getArtifactId, md.getClassifier, md.getType, md.getVersion), md.getScope)
+
+//      logger.debug(s"${md.getArtifactId} + ${md.getVersion}")
       dependency
     })
 
