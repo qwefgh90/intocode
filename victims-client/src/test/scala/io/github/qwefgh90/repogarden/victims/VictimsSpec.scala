@@ -55,6 +55,21 @@ class VictimsSpec extends FlatSpec with Matchers{
 	Option(systemToken)
   
   require(systemTokenOpt.isDefined)
+
+  import scala.concurrent.Future
+  import scala.concurrent.forkjoin._
+  import scala.concurrent.ExecutionContext
+  import io.github.qwefgh90.repogarden.victims
+  import io.github.qwefgh90.repogarden.victims.MvnResult._
+  import scala.concurrent.duration._
+
+  "DependencyLoader" should "read pom.xml" in {
+    val dl = DependencyLoader(Paths.get("""C:\developer-tools-free-license\apache-maven-3.3.9\bin\mvn.cmd"""), ExecutionContext.global)
+    val (list, exitCode) = dl.execute(Paths.get("""C:\WorkspaceWeb\repogarden\victims-client\src\test\resources\pom.xml"""))
+    list.foreach((a)=>{logger.debug(a)})
+    assert(Await.result(exitCode, Duration(30, SECONDS)).equals(MvnResult.Success))
+  }
+
   /*
    "A victims loader" should "load some files having cve" in {
    assert(VictimsLoader(systemTokenOpt).getFirstPageIteratorOfCommits.size() > 0)
@@ -107,7 +122,7 @@ class VictimsSpec extends FlatSpec with Matchers{
    assert(victim.getAffected.get(1) === mod2)
    }
    */
-
+/*
   "Maven Model" should "return all dependencies" in {
 
     System.out.println( "------------------------------------------------------------" );
@@ -119,47 +134,37 @@ class VictimsSpec extends FlatSpec with Matchers{
     session.setConfigProperty( ConflictResolver.CONFIG_PROP_VERBOSE, true );
     session.setConfigProperty( DependencyManagerUtils.CONFIG_PROP_VERBOSE, true );
 
-   // val artifact = new DefaultArtifact( "org.apache.maven:maven-aether-provider:3.1.0" );
-//   val artifact = new DefaultArtifact( "io.github.qwefgh90:jsearch:0.3.0" );
-
-//    val pomArtifact = new SubArtifact( artifact, "", "pom" );
-//    pomArtifact.setFile(new File(getClass().getResource("/pom.xml").toURI))
-/*
-    val descriptorRequest = new ArtifactDescriptorRequest();
-    descriptorRequest.setArtifact( artifact );
-    descriptorRequest.setRepositories( Booter.newRepositories( system, session ) );
-    val descriptorResult = system.readArtifactDescriptor( session, descriptorRequest );
-*/
-
     val testartifact = new DefaultArtifact( "io.github.qwefgh90xxxxx:jsearchxxx:0.3.0" );
 	val modelBuilder = new DefaultModelBuilderFactory().newInstance();
 
     val pomFile = new File(getClass().getResource("/pom.xml").toURI)
-    val modelRequest = new DefaultModelBuildingRequest()
-    modelRequest.setPomFile(pomFile)
+    val modelRequest = new DefaultModelBuildingRequest().setPomFile(pomFile)
+    val model = modelBuilder.buildRawModel(pomFile, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get
+//    model.setParent(null)
+    modelRequest.setRawModel(model)
+    modelRequest.setPomFile(null)
+
+
     val modelBuildingResult = modelBuilder.build(modelRequest)
     val mavenDependencies = modelBuildingResult.getEffectiveModel.getDependencies()
 
     val dp = mavenDependencies.asScala.filter({md => md.getScope == md.getScope}).map(md =>{
       val dependency = new org.eclipse.aether.graph.Dependency(new DefaultArtifact(md.getGroupId, md.getArtifactId, md.getClassifier, md.getType, md.getVersion), md.getScope)
-
-//      logger.debug(s"${md.getArtifactId} + ${md.getVersion}")
       dependency
     })
 
     val collectRequest = new CollectRequest();
     collectRequest.setRootArtifact( testartifact );
-    //    collectRequest.setDependencies( descriptorResult.getDependencies() );
     collectRequest.setDependencies(dp.asJava);
-    //    collectRequest.setManagedDependencies(dp.asJava);
     collectRequest.setRepositories( Booter.newRepositories( system, session ) );
 
     val collectResult = system.collectDependencies( session, collectRequest );
     
     collectResult.getRoot().accept( new ConsoleDependencyGraphDumper() );
-  }
+  }*/
   
   //https://github.com/victims/victims-cve-db/blob/master/database/java/2016/3092.yaml
+/*
   "A VictimsLoader" should "scan a vulnerable package" in {
     val victimLoader = VictimsLoader(systemTokenOpt);
     val resultOpt = victimLoader.scanSingleArtifact("org.apache.tomcat", "tomcat-catalina", "8.0.33")
@@ -179,4 +184,5 @@ class VictimsSpec extends FlatSpec with Matchers{
     assert(resultOpt6.isDefined)
     assert(resultOpt6.get.vulerableList.size == 4)
   }
+ */
 }

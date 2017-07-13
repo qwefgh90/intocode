@@ -41,7 +41,6 @@ lazy val victims_client = (project in file("victims-client")).dependsOn(bp).
     version := "0.1.0-SNAPSHOT",
     name := "victims-client",
     libraryDependencies += "org.yaml" % "snakeyaml" % "1.18",
-    libraryDependencies += "org.apache.maven" % "maven-model" % "3.3.9",
     libraryDependencies += "org.eclipse.aether" % "aether-connector-basic" % "1.1.0",
     libraryDependencies += "org.apache.maven" % "maven-aether-provider" % "3.3.9",
     libraryDependencies += "org.eclipse.aether" % "aether-transport-file" % "1.1.0",
