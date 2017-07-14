@@ -58,171 +58,101 @@ class VictimsSpec extends FlatSpec with Matchers{
 	Option.empty
   else
 	Option(systemToken)
-  
   require(systemTokenOpt.isDefined)
-  "DependencyLoader" should "find parents dependenies" in {
-    val conf = ConfigFactory.load("victims_client.conf")
-    val mvnPath = Paths.get(conf.getString("maven.path"))
-    require(Files.exists(mvnPath), s"${mvnPath.toAbsolutePath.toString} does not exists.")
-
-    val dl = DependencyLoader(mvnPath, ExecutionContext.global)
-    val ExecutionResult(ob1, result1) = dl.execute(Paths.get(getClass().getResource("/valid_pom/pom.xml").toURI))
-      
-    val mvnResult = Await.result(result1, Duration(60, SECONDS))
-    val source = scala.io.Source.fromFile(mvnResult.outputPath.get.toFile())
-    val lineList = dl.createLevelLineFromMvnOutput(source.getLines)
-    val parentList = dl.findParents(lineList, levelLine => {
-      levelLine.line.contains("org.codehaus.woodstox:stax2-api:jar:3.1.4:compile")
-    })
-    
-    parentList.foreach(found => {
-      logger.debug(s"found: ${found.line}")
-      found.parents.foreach({ parent => 
-        logger.debug(s"parent: ${parent.line}")
-      })
-    })
-
-    assert(parentList(0).parents.map(line => line.line).sameElements(
-      List(
-        "org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile"
-          ,"org.apache.cxf:cxf-core:jar:3.0.3:compile"
-          ,"org.apache.cxf:cxf-rt-rs-client:jar:3.0.3:compile"
-          ,"org.apache.tika:tika-parsers:jar:1.14:compile"
-          ,"io.github.qwefgh90:jsearch:jar:0.2.0")), "Two list must be same.")
-
-/*    assert(dl.findParents(lineList, levelLine => {
-      levelLine.line.contains("io.github.qwefgh90:jsearch:jar:0.2.0")
-    })(0).parents.length == 0, "A size of parent of root must be zero.")
- */
-    source.close()
+  
+  "A victims loader" should "load some files having cve" in {
+    assert(VictimsLoader(systemTokenOpt).getFirstPageIteratorOfCommits.size() > 0)
+    assert(VictimsLoader(systemTokenOpt).getLatestCveList.size > 20)
   }
-
-  "DependencyLoader" should "handle valid or invalid pom.xml" in {
-    val conf = ConfigFactory.load("victims_client.conf")
-    val mvnPath = Paths.get(conf.getString("maven.path"))
-    require(Files.exists(mvnPath), s"${mvnPath.toAbsolutePath.toString} does not exists.")
-
-    val dl = DependencyLoader(mvnPath, ExecutionContext.global)
-    val ExecutionResult(ob1, result1) = dl.execute(Paths.get(getClass().getResource("/valid_pom/pom.xml").toURI))
-    ob1.foreach((a)=>{logger.debug(a)})
-
-    val ExecutionResult(ob2, result2) = dl.execute(Paths.get(getClass().getResource("/invalid_pom/pom.xml").toURI))
-    ob2.foreach((a)=>{logger.debug(a)})
-    assert(Await.result(result1, Duration(60, SECONDS)).resultCode.equals(MvnResult.Success))
-    assert(Await.result(result2, Duration(60, SECONDS)).resultCode.equals(MvnResult.Fail))
-    assert(Files.exists(Await.result(result1, Duration(60, SECONDS)).outputPath.get))
-    assert(Await.result(result2, Duration(60, SECONDS)).outputPath.isEmpty)
-    
-    val outputPath = Await.result(result1, Duration(60, SECONDS)).outputPath.get
-    val msgOccurrenceCount = dl.traverseMvnOutput(outputPath, new Visitor[LevelLine,Int]{
-      override var acc = 0
-      override def enter(levelLine: LevelLine, stack: List[LevelLine]){
-        logger.debug(s"enter: ${levelLine.toString}")
-        acc = acc + 1
-      }
-      override def leave(levelLine: LevelLine){
-        acc = acc + 1
-        logger.debug(s"leave: ${levelLine.toString}")
-      }
+  
+  "A yaml parser for victic model" should "not throw exceptions" in{
+    val constructor = new Constructor(classOf[Victim]);//Car.class is root
+    val yaml = new Yaml(constructor);
+    VictimsLoader(systemTokenOpt).getLatestCveList.foreach(repositoryContent => {
+      val content: String = repositoryContent._1.getContent
+      val victim = yaml.load(content).asInstanceOf[Victim]
+      logger.debug(s"${repositoryContent._1.getPath} is loaded.")
+      assert(victim.getTitle != null && victim.getTitle.length() > 0)
+      assert(victim.getCve != null && victim.getCve.length() > 0)
+      assert(victim.getAffected != null && victim.getAffected.size() > 0)
     })
-    assert(msgOccurrenceCount == 204)
   }
-
-  /*
-   "A victims loader" should "load some files having cve" in {
-   assert(VictimsLoader(systemTokenOpt).getFirstPageIteratorOfCommits.size() > 0)
-   assert(VictimsLoader(systemTokenOpt).getLatestCveList.size > 20)
-   }
-   
-   "A yaml parser for victic model" should "not throw exceptions" in{
-   val constructor = new Constructor(classOf[Victim]);//Car.class is root
-   val yaml = new Yaml(constructor);
-   VictimsLoader(systemTokenOpt).getLatestCveList.foreach(repositoryContent => {
-   logger.debug(repositoryContent._1.getPath)
-   val content: String = repositoryContent._1.getContent
-   val victim = yaml.load(content).asInstanceOf[Victim]
-   assert(victim.getTitle != null && victim.getTitle.length() > 0)
-   assert(victim.getCve != null && victim.getCve.length() > 0)
-   assert(victim.getAffected != null && victim.getAffected.size() > 0)
-   })
-   }
-   
-   "A Victim model" should "hold information in fields" in {
-   val constructor = new Constructor(classOf[Victim]);//Car.class is root
-   val yaml = new Yaml(constructor);
-   val victim = yaml.load(getClass().getResource("/test.yaml").openStream()).asInstanceOf[Victim];
-   
-   assert(victim.getCve === "2016-3092")
-   assert(victim.getTitle === "Apache Commons Fileupload: Denial of Service")
-   assert(victim.getDescription.replaceAll("[\n\r\t ]", "") === """
+  
+  "A Victim model" should "hold information in fields" in {
+    val constructor = new Constructor(classOf[Victim]);//Car.class is root
+    val yaml = new Yaml(constructor);
+    val victim = yaml.load(getClass().getResource("/test.yaml").openStream()).asInstanceOf[Victim];
+    
+    assert(victim.getCve === "2016-3092")
+    assert(victim.getTitle === "Apache Commons Fileupload: Denial of Service")
+    assert(victim.getDescription.replaceAll("[\n\r\t ]", "") === """
    A malicious client can send file upload requests that cause the HTTP server
    using the Apache Commons Fileupload library to become unresponsive, preventing
    the server from servicing other requests. A fork of this component
    is also included in Apache Tomcat.""".replaceAll("[\n\r\t ]", "") )
-   assert(victim.getCvss_v2 === "4.3")
-   assert(victim.getReferences.size === 5)
-   assert(victim.getAffected.size === 2)
-   val mod1 = new JavaModule("commons-fileupload", "commons-fileupload"
-   , List("<=1.3.1,1.3", "<=1.2.2,1.2").asJava
-   , List(">=1.3.2,1.3").asJava
-   , null);
-   val mod2 = new JavaModule("org.apache.tomcat", "tomcat-catalina"
-   , List("<=9.0.0.M7,9", "<=8.5.2,8.5"
-   , "<=8.0.35,8.0"
-   , "<=7.0.69,7").asJava
-   , List(
-   ">=9.0.0.M8,9"
-   , ">=8.5.3,8.5"
-   , ">=8.0.36,8.0"
-   , ">=7.0.70,7").asJava
-   , null);
-   assert(victim.getAffected.get(0) === mod1)
-   assert(victim.getAffected.get(1) === mod2)
-   }
-   */
-/*
-  "Maven Model" should "return all dependencies" in {
+    assert(victim.getCvss_v2 === "4.3")
+    assert(victim.getReferences.size === 5)
+    assert(victim.getAffected.size === 2)
+    val mod1 = new JavaModule("commons-fileupload", "commons-fileupload"
+      , List("<=1.3.1,1.3", "<=1.2.2,1.2").asJava
+      , List(">=1.3.2,1.3").asJava
+      , null);
+    val mod2 = new JavaModule("org.apache.tomcat", "tomcat-catalina"
+      , List("<=9.0.0.M7,9", "<=8.5.2,8.5"
+        , "<=8.0.35,8.0"
+        , "<=7.0.69,7").asJava
+      , List(
+      ">=9.0.0.M8,9"
+        , ">=8.5.3,8.5"
+        , ">=8.0.36,8.0"
+        , ">=7.0.70,7").asJava
+      , null);
+    assert(victim.getAffected.get(0) === mod1)
+    assert(victim.getAffected.get(1) === mod2)
+  }
+  
+  /*
+   "Maven Model" should "return all dependencies" in {
 
-    System.out.println( "------------------------------------------------------------" );
+   System.out.println( "------------------------------------------------------------" );
 
-    val system = Booter.newRepositorySystem();
+   val system = Booter.newRepositorySystem();
 
-    val session = Booter.newRepositorySystemSession( system );
+   val session = Booter.newRepositorySystemSession( system );
 
-    session.setConfigProperty( ConflictResolver.CONFIG_PROP_VERBOSE, true );
-    session.setConfigProperty( DependencyManagerUtils.CONFIG_PROP_VERBOSE, true );
+   session.setConfigProperty( ConflictResolver.CONFIG_PROP_VERBOSE, true );
+   session.setConfigProperty( DependencyManagerUtils.CONFIG_PROP_VERBOSE, true );
 
-    val testartifact = new DefaultArtifact( "io.github.qwefgh90xxxxx:jsearchxxx:0.3.0" );
-	val modelBuilder = new DefaultModelBuilderFactory().newInstance();
+   val testartifact = new DefaultArtifact( "io.github.qwefgh90xxxxx:jsearchxxx:0.3.0" );
+   val modelBuilder = new DefaultModelBuilderFactory().newInstance();
 
-    val pomFile = new File(getClass().getResource("/pom.xml").toURI)
-    val modelRequest = new DefaultModelBuildingRequest().setPomFile(pomFile)
-    val model = modelBuilder.buildRawModel(pomFile, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get
-//    model.setParent(null)
-    modelRequest.setRawModel(model)
-    modelRequest.setPomFile(null)
+   val pomFile = new File(getClass().getResource("/pom.xml").toURI)
+   val modelRequest = new DefaultModelBuildingRequest().setPomFile(pomFile)
+   val model = modelBuilder.buildRawModel(pomFile, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get
+   //    model.setParent(null)
+   modelRequest.setRawModel(model)
+   modelRequest.setPomFile(null)
 
 
-    val modelBuildingResult = modelBuilder.build(modelRequest)
-    val mavenDependencies = modelBuildingResult.getEffectiveModel.getDependencies()
+   val modelBuildingResult = modelBuilder.build(modelRequest)
+   val mavenDependencies = modelBuildingResult.getEffectiveModel.getDependencies()
 
-    val dp = mavenDependencies.asScala.filter({md => md.getScope == md.getScope}).map(md =>{
-      val dependency = new org.eclipse.aether.graph.Dependency(new DefaultArtifact(md.getGroupId, md.getArtifactId, md.getClassifier, md.getType, md.getVersion), md.getScope)
-      dependency
-    })
+   val dp = mavenDependencies.asScala.filter({md => md.getScope == md.getScope}).map(md =>{
+   val dependency = new org.eclipse.aether.graph.Dependency(new DefaultArtifact(md.getGroupId, md.getArtifactId, md.getClassifier, md.getType, md.getVersion), md.getScope)
+   dependency
+   })
 
-    val collectRequest = new CollectRequest();
-    collectRequest.setRootArtifact( testartifact );
-    collectRequest.setDependencies(dp.asJava);
-    collectRequest.setRepositories( Booter.newRepositories( system, session ) );
+   val collectRequest = new CollectRequest();
+   collectRequest.setRootArtifact( testartifact );
+   collectRequest.setDependencies(dp.asJava);
+   collectRequest.setRepositories( Booter.newRepositories( system, session ) );
 
-    val collectResult = system.collectDependencies( session, collectRequest );
-    
-    collectResult.getRoot().accept( new ConsoleDependencyGraphDumper() );
-  }*/
+   val collectResult = system.collectDependencies( session, collectRequest );
+   
+   collectResult.getRoot().accept( new ConsoleDependencyGraphDumper() );
+   }*/
   
   //https://github.com/victims/victims-cve-db/blob/master/database/java/2016/3092.yaml
-/*
   "A VictimsLoader" should "scan a vulnerable package" in {
     val victimLoader = VictimsLoader(systemTokenOpt);
     val resultOpt = victimLoader.scanSingleArtifact("org.apache.tomcat", "tomcat-catalina", "8.0.33")
@@ -242,5 +172,4 @@ class VictimsSpec extends FlatSpec with Matchers{
     assert(resultOpt6.isDefined)
     assert(resultOpt6.get.vulerableList.size == 4)
   }
- */
 }

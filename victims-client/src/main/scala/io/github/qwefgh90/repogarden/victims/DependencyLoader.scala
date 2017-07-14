@@ -63,8 +63,7 @@ package maven {
 
     private val logger = Logger(classOf[DependencyLoader])
 
-    def findParents(iterator: Iterator[LevelLine], contain: LevelLine => Boolean): List[Found] = {
-      traverseLevelLines(iterator, new Visitor[LevelLine, List[Found]] {
+    def findParents(list: scala.collection.Traversable[LevelLine], contain: LevelLine => Boolean): List[Found] = {      traverseLevelLines(list.toIterator, new Visitor[LevelLine, List[Found]] {
         override var acc: List[Found] = Nil
         override def enter(levelLine: LevelLine, stack: List[LevelLine]){
           if(contain(levelLine))
@@ -94,7 +93,6 @@ package maven {
     }
 
     def traverseLevelLines[A >: LevelLine, B](levelIterator: Iterator[LevelLine], visitor: Visitor[A,B]): B = {
-
       @tailrec def go(seq: Int, iterator: Iterator[LevelLine], stack: List[LevelLine]) {
         if(iterator.hasNext){
           val selected = iterator.next
