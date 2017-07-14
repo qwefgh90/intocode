@@ -41,156 +41,179 @@ import rx.lang.scala.subscriptions._
 import scala.collection._
 import scala.annotation.tailrec
 
-object MvnResult extends Enumeration {
-  type MvnResult = Value
-  val Success, Fail = Value
-}
-
-import MvnResult._
-
-case class ExecutionResult(log: Observable[String], result: Future[MavenResult]){}
-case class MavenResult(resultCode: MvnResult, outputPath: Option[Path]){}
-case class LevelLine(level: Int, line: String)
-
-trait Visitor[A,B] {
-  var acc: B
-  def enter(e: A){
+package maven { 
+  object MvnResult extends Enumeration {
+    type MvnResult = Value
+    val Success, Fail = Value
   }
-  def leave(e: A){
+  import MvnResult._
+
+  case class ExecutionResult(log: Observable[String], result: Future[MavenResult]){}
+  case class MavenResult(resultCode: MvnResult, outputPath: Option[Path]){}
+  case class LevelLine(seq: Int, level: Int, line: String)
+  case class Found(line: LevelLine, parents: List[LevelLine])
+
+  trait Visitor[A,B] {
+    var acc: B
+    def enter(e: A, stack: List[A])
+    def leave(e: A)
   }
-}
 
-class DependencyLoader (mvnPath: Path, implicit val ec: ExecutionContext) {
-  private val logger = Logger(classOf[DependencyLoader])
+  class DependencyLoader (mvnPath: Path, implicit val ec: ExecutionContext) {
 
-  def traverseMvnOutput[B](path: Path, visitor: Visitor[LevelLine,B]): B = {
-    val source = Source.fromFile(path.toFile())
-    val headLevelPattern = (ch: Char) => (ch == ' ' || ch == '+' || ch == '-' || ch == '|' || ch == '\\')
-    val levelIterator = source.getLines.map(line => LevelLine(line.takeWhile(headLevelPattern).length()/3, line.dropWhile(headLevelPattern)))
+    private val logger = Logger(classOf[DependencyLoader])
 
-    @tailrec def go(iterator: Iterator[LevelLine], stack: List[LevelLine]) {
-      if(iterator.hasNext){
-        val selected = iterator.next
-        val LevelLine(level, line) = selected
-        val nextStack = if(stack.nonEmpty){
-          val LevelLine(lastLevel, lastLine) = stack.head
-          val removed = if(lastLevel >= level)
-            Option(stack.head)
-          else
-            Option.empty
-
-          if(removed.nonEmpty)
-            visitor.leave(removed.get)//leave
-
-          visitor.enter(selected)//enter
-
-          val newStack = if(removed.nonEmpty)
-            selected :: stack.tail
-          else
-            selected :: stack
-          newStack
-        }else{
-          visitor.enter(selected)//enter
-          val newStack = selected :: Nil
-          newStack
+    def findParents(iterator: Iterator[LevelLine], contain: LevelLine => Boolean): List[Found] = {
+      traverseLevelLines(iterator, new Visitor[LevelLine, List[Found]] {
+        override var acc: List[Found] = Nil
+        override def enter(levelLine: LevelLine, stack: List[LevelLine]){
+          if(contain(levelLine))
+            acc = (Found(levelLine, stack) :: acc)
         }
-        go(iterator, nextStack)
-      }else{
-        stack.foreach(v => visitor.leave(v))//leave remainings
+        override def leave(levelLine: LevelLine){}
+      })
+    }
+
+    def createLevelLineFromMvnOutput(iterator: Iterator[String]): Iterator[LevelLine] = {
+      val headLevelPattern = (ch: Char) => (ch == ' ' || ch == '+' || ch == '-' || ch == '|' || ch == '\\')
+      iterator.zipWithIndex.map(zip => LevelLine(zip._2 + 1, zip._1.takeWhile(headLevelPattern).length()/3, zip._1.dropWhile(headLevelPattern)))
+    }
+
+    def traverseMvnOutput[A >: LevelLine, B](path: Path, visitor: Visitor[A,B]): B = {
+      val source = Source.fromFile(path.toFile())
+      try{
+        traverseMvnOutput(source.getLines, visitor)
+      }finally{
+        source.close()
       }
     }
-    go(levelIterator, Nil)
-    visitor.acc
-  }
 
-  /*
-   * run "mvn dependency:tree" in a dir which containing pom.xml
-   * and return observable of a result output of command
-   * and return a future to hold command exit code.
-   */
-  def execute(pomFile: Path): ExecutionResult = {
-    val builder = new ProcessBuilder(mvnPath.toAbsolutePath().toString(), "dependency:tree", "-DoutputFile=log.txt")
-    builder.directory(pomFile.getParent.toFile)
-    val process = builder.start()
+    def traverseMvnOutput[A >: LevelLine, B](iterator: Iterator[String], visitor: Visitor[A,B]): B = {
+      val levelIterator = createLevelLineFromMvnOutput(iterator)
+      traverseLevelLines(levelIterator, visitor)
+    }
 
+    def traverseLevelLines[A >: LevelLine, B](levelIterator: Iterator[LevelLine], visitor: Visitor[A,B]): B = {
 
+      @tailrec def go(seq: Int, iterator: Iterator[LevelLine], stack: List[LevelLine]) {
+        if(iterator.hasNext){
+          val selected = iterator.next
+          val LevelLine(seq, level, line) = selected
+          val nextStack = if(stack.nonEmpty){
+            val LevelLine(seq, lastLevel, lastLine) = stack.head
+            val removed = if(lastLevel >= level)
+              stack.take(lastLevel - level + 1)
+            else
+              Nil
+
+            removed.foreach(e => {visitor.leave(e)}) //leave
+            visitor.enter(selected, stack.drop(removed.length))//enter
+
+            selected :: stack.drop(removed.length)
+          }else{
+            visitor.enter(selected, stack)//enter
+            val newStack = selected :: Nil
+            newStack
+          }
+          go(seq+1, iterator, nextStack)
+        }else{
+          stack.foreach(v => visitor.leave(v))//leave remainings
+        }
+      
+      }
+      go(1, levelIterator, Nil)
+      visitor.acc
+    }
 
     /*
-     ReplaySubject is used for not blocking execution infinitely.
-     Because some native platforms only provide limited buffer size for standard input and output streams, failure to promptly write the input stream or read the output stream of the subprocess may cause the subprocess to block, or even deadlock. https://docs.oracle.com/javase/7/docs/api/java/lang/Process.html#getInputStream()
+     * run "mvn dependency:tree" in a dir which containing pom.xml
+     * and return observable of a result output of command
+     * and return a future to hold command exit code.
      */
-    val br = new BufferedReader(new InputStreamReader(process.getInputStream()))
-    val stream = Stream.continually(br.readLine()).takeWhile(str => str != null)
-    val replay = ReplaySubject[String]()
+    def execute(pomFile: Path): ExecutionResult = {
+      val builder = new ProcessBuilder(mvnPath.toAbsolutePath().toString(), "dependency:tree", "-DoutputFile=log.txt")
+      builder.directory(pomFile.getParent.toFile)
+      val process = builder.start()
 
-    ExecutionResult(replay
-      , Future{blocking(
-        {
-          try{
-            stream.foreach(str => replay.onNext(str))
-          }finally{
-            br.close()
-            replay.onCompleted()
+
+
+      /*
+       ReplaySubject is used for not blocking execution infinitely.
+       Because some native platforms only provide limited buffer size for standard input and output streams, failure to promptly write the input stream or read the output stream of the subprocess may cause the subprocess to block, or even deadlock. https://docs.oracle.com/javase/7/docs/api/java/lang/Process.html#getInputStream()
+       */
+      val br = new BufferedReader(new InputStreamReader(process.getInputStream()))
+      val stream = Stream.continually(br.readLine()).takeWhile(str => str != null)
+      val replay = ReplaySubject[String]()
+
+      ExecutionResult(replay
+        , Future{blocking(
+          {
+            try{
+              stream.foreach(str => replay.onNext(str))
+            }finally{
+              br.close()
+              replay.onCompleted()
+            }
+            if(process.waitFor() == 0) MavenResult(MvnResult.Success, Option(pomFile.getParent.resolve("log.txt"))) else MavenResult(MvnResult.Fail, Option.empty)
           }
-          if(process.waitFor() == 0) MavenResult(MvnResult.Success, Option(pomFile.getParent.resolve("log.txt"))) else MavenResult(MvnResult.Fail, Option.empty)
-        }
+        )
+      }
       )
     }
-    )
+
+    /*  def execute(pomPath: Path): Iterator[String] = {
+     val source = Source.fromFile(pomPath.toFile)
+     source.getLines
+     }*/
+
+    /*    Future {
+     blocking({
+     ""
+     })
+     }*/
+
+
   }
 
-/*  def execute(pomPath: Path): Iterator[String] = {
-    val source = Source.fromFile(pomPath.toFile)
-    source.getLines
-  }*/
-
-/*    Future {
-      blocking({
-        ""
-      })
-    }*/
 
 
-}
+  object DependencyLoader {
 
+    def apply(mvnPath: Path, ec: ExecutionContext): DependencyLoader = {
+      return new DependencyLoader(mvnPath, ec)
+    }
 
+    /**
+      * work with DependencyVisitor
+      */
+    /*  def getCollectResult(path: Path, visitor: DependencyVisitor): Boolean = {
+     val system = Booter.newRepositorySystem();
+     val session = Booter.newRepositorySystemSession( system );
+     session.setConfigProperty( ConflictResolver.CONFIG_PROP_VERBOSE, true );
+     session.setConfigProperty( DependencyManagerUtils.CONFIG_PROP_VERBOSE, true );
 
-object DependencyLoader {
+	 val modelBuilder = new DefaultModelBuilderFactory().newInstance();
 
-  def apply(mvnPath: Path, ec: ExecutionContext): DependencyLoader = {
-    return new DependencyLoader(mvnPath, ec)
+     val pomFile = path.toFile
+     val modelRequest = new DefaultModelBuildingRequest()
+     modelRequest.setPomFile(pomFile)
+     val modelBuildingResult = modelBuilder.build(modelRequest)
+     val mavenDependencies = modelBuildingResult.getEffectiveModel.getDependencies
+
+     val dp = mavenDependencies.asScala.map(md => {
+     val dependency = new org.eclipse.aether.graph.Dependency(new DefaultArtifact(md.getGroupId, md.getArtifactId, md.getClassifier, md.getType, md.getVersion), md.getScope)
+     dependency
+     })
+
+     val collectRequest = new CollectRequest()
+     collectRequest.setRootArtifact(new DefaultArtifact( "_:_:_" ))
+     //    collectRequest.setDependencies( descriptorResult.getDependencies() )
+     collectRequest.setDependencies(dp.asJava)
+     //    collectRequest.setManagedDependencies(dp.asJava)
+     collectRequest.setRepositories( Booter.newRepositories( system, session ) )
+     val collectResult = system.collectDependencies( session, collectRequest )
+
+     collectResult.getRoot().accept( visitor );
+     }*/
   }
-
-  /**
-    * work with DependencyVisitor
-    */
-/*  def getCollectResult(path: Path, visitor: DependencyVisitor): Boolean = {
-    val system = Booter.newRepositorySystem();
-    val session = Booter.newRepositorySystemSession( system );
-    session.setConfigProperty( ConflictResolver.CONFIG_PROP_VERBOSE, true );
-    session.setConfigProperty( DependencyManagerUtils.CONFIG_PROP_VERBOSE, true );
-
-	val modelBuilder = new DefaultModelBuilderFactory().newInstance();
-
-    val pomFile = path.toFile
-    val modelRequest = new DefaultModelBuildingRequest()
-    modelRequest.setPomFile(pomFile)
-    val modelBuildingResult = modelBuilder.build(modelRequest)
-    val mavenDependencies = modelBuildingResult.getEffectiveModel.getDependencies
-
-    val dp = mavenDependencies.asScala.map(md => {
-      val dependency = new org.eclipse.aether.graph.Dependency(new DefaultArtifact(md.getGroupId, md.getArtifactId, md.getClassifier, md.getType, md.getVersion), md.getScope)
-      dependency
-    })
-
-    val collectRequest = new CollectRequest()
-    collectRequest.setRootArtifact(new DefaultArtifact( "_:_:_" ))
-    //    collectRequest.setDependencies( descriptorResult.getDependencies() )
-    collectRequest.setDependencies(dp.asJava)
-    //    collectRequest.setManagedDependencies(dp.asJava)
-    collectRequest.setRepositories( Booter.newRepositories( system, session ) )
-    val collectResult = system.collectDependencies( session, collectRequest )
-
-    collectResult.getRoot().accept( visitor );
-  }*/
 }

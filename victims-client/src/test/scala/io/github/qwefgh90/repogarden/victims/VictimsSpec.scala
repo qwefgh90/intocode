@@ -48,7 +48,7 @@ import com.typesafe.config.ConfigFactory
 import scala.concurrent.Future
 import scala.concurrent.forkjoin._
 import scala.concurrent.ExecutionContext
-import io.github.qwefgh90.repogarden.victims._
+import io.github.qwefgh90.repogarden.victims.maven._
 import scala.concurrent.duration._
 
 class VictimsSpec extends FlatSpec with Matchers{
@@ -60,11 +60,47 @@ class VictimsSpec extends FlatSpec with Matchers{
 	Option(systemToken)
   
   require(systemTokenOpt.isDefined)
+  "DependencyLoader" should "find parents dependenies" in {
+    val conf = ConfigFactory.load("victims_client.conf")
+    val mvnPath = Paths.get(conf.getString("maven.path"))
+    require(Files.exists(mvnPath), s"${mvnPath.toAbsolutePath.toString} does not exists.")
+
+    val dl = DependencyLoader(mvnPath, ExecutionContext.global)
+    val ExecutionResult(ob1, result1) = dl.execute(Paths.get(getClass().getResource("/valid_pom/pom.xml").toURI))
+      
+    val mvnResult = Await.result(result1, Duration(60, SECONDS))
+    val source = scala.io.Source.fromFile(mvnResult.outputPath.get.toFile())
+    val lineList = dl.createLevelLineFromMvnOutput(source.getLines)
+    val parentList = dl.findParents(lineList, levelLine => {
+      levelLine.line.contains("org.codehaus.woodstox:stax2-api:jar:3.1.4:compile")
+    })
+    
+    parentList.foreach(found => {
+      logger.debug(s"found: ${found.line}")
+      found.parents.foreach({ parent => 
+        logger.debug(s"parent: ${parent.line}")
+      })
+    })
+
+    assert(parentList(0).parents.map(line => line.line).sameElements(
+      List(
+        "org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile"
+          ,"org.apache.cxf:cxf-core:jar:3.0.3:compile"
+          ,"org.apache.cxf:cxf-rt-rs-client:jar:3.0.3:compile"
+          ,"org.apache.tika:tika-parsers:jar:1.14:compile"
+          ,"io.github.qwefgh90:jsearch:jar:0.2.0")), "Two list must be same.")
+
+/*    assert(dl.findParents(lineList, levelLine => {
+      levelLine.line.contains("io.github.qwefgh90:jsearch:jar:0.2.0")
+    })(0).parents.length == 0, "A size of parent of root must be zero.")
+ */
+    source.close()
+  }
 
   "DependencyLoader" should "handle valid or invalid pom.xml" in {
     val conf = ConfigFactory.load("victims_client.conf")
     val mvnPath = Paths.get(conf.getString("maven.path"))
-    require(Files.exists(mvnPath))
+    require(Files.exists(mvnPath), s"${mvnPath.toAbsolutePath.toString} does not exists.")
 
     val dl = DependencyLoader(mvnPath, ExecutionContext.global)
     val ExecutionResult(ob1, result1) = dl.execute(Paths.get(getClass().getResource("/valid_pom/pom.xml").toURI))
@@ -80,13 +116,13 @@ class VictimsSpec extends FlatSpec with Matchers{
     val outputPath = Await.result(result1, Duration(60, SECONDS)).outputPath.get
     val msgOccurrenceCount = dl.traverseMvnOutput(outputPath, new Visitor[LevelLine,Int]{
       override var acc = 0
-      override def enter(levelLine: LevelLine){
-        logger.debug(s"enter: $levelLine.toString")
+      override def enter(levelLine: LevelLine, stack: List[LevelLine]){
+        logger.debug(s"enter: ${levelLine.toString}")
         acc = acc + 1
       }
       override def leave(levelLine: LevelLine){
         acc = acc + 1
-        logger.debug(s"leave: $levelLine.toString")
+        logger.debug(s"leave: ${levelLine.toString}")
       }
     })
     assert(msgOccurrenceCount == 204)
