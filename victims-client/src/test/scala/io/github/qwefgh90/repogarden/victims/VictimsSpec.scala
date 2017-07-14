@@ -31,20 +31,25 @@ import io.github.qwefgh90.repogarden.victims.util.Booter;
 import io.github.qwefgh90.repogarden.victims.util.ConsoleDependencyGraphDumper;
 
 import org.eclipse.aether.graph._
-import org.eclipse.aether.util.artifact.SubArtifact;
-import org.eclipse.aether.DefaultRepositorySystemSession;
-import org.eclipse.aether.RepositorySystem;
-import org.eclipse.aether.artifact.Artifact;
-import org.eclipse.aether.artifact.DefaultArtifact;
-import org.eclipse.aether.collection.CollectRequest;
-import org.eclipse.aether.collection.CollectResult;
-import io.github.qwefgh90.repogarden.victims.util.Booter;
-import io.github.qwefgh90.repogarden.victims.util.ConsoleDependencyGraphDumper;
-import org.eclipse.aether.resolution.ArtifactDescriptorRequest;
-import org.eclipse.aether.resolution.ArtifactDescriptorResult;
-import org.eclipse.aether.util.graph.manager.DependencyManagerUtils;
-import org.eclipse.aether.util.graph.transformer.ConflictResolver;
-
+import org.eclipse.aether.util.artifact.SubArtifact
+import org.eclipse.aether.DefaultRepositorySystemSession
+import org.eclipse.aether.RepositorySystem
+import org.eclipse.aether.artifact.Artifact
+import org.eclipse.aether.artifact.DefaultArtifact
+import org.eclipse.aether.collection.CollectRequest
+import org.eclipse.aether.collection.CollectResult
+import io.github.qwefgh90.repogarden.victims.util.Booter
+import io.github.qwefgh90.repogarden.victims.util.ConsoleDependencyGraphDumper
+import org.eclipse.aether.resolution.ArtifactDescriptorRequest
+import org.eclipse.aether.resolution.ArtifactDescriptorResult
+import org.eclipse.aether.util.graph.manager.DependencyManagerUtils
+import org.eclipse.aether.util.graph.transformer.ConflictResolver
+import com.typesafe.config.ConfigFactory
+import scala.concurrent.Future
+import scala.concurrent.forkjoin._
+import scala.concurrent.ExecutionContext
+import io.github.qwefgh90.repogarden.victims._
+import scala.concurrent.duration._
 
 class VictimsSpec extends FlatSpec with Matchers{
   private val logger = Logger(classOf[VictimsSpec])
@@ -56,18 +61,35 @@ class VictimsSpec extends FlatSpec with Matchers{
   
   require(systemTokenOpt.isDefined)
 
-  import scala.concurrent.Future
-  import scala.concurrent.forkjoin._
-  import scala.concurrent.ExecutionContext
-  import io.github.qwefgh90.repogarden.victims
-  import io.github.qwefgh90.repogarden.victims.MvnResult._
-  import scala.concurrent.duration._
+  "DependencyLoader" should "handle valid or invalid pom.xml" in {
+    val conf = ConfigFactory.load("victims_client.conf")
+    val mvnPath = Paths.get(conf.getString("maven.path"))
+    require(Files.exists(mvnPath))
 
-  "DependencyLoader" should "read pom.xml" in {
-    val dl = DependencyLoader(Paths.get("""C:\developer-tools-free-license\apache-maven-3.3.9\bin\mvn.cmd"""), ExecutionContext.global)
-    val (list, exitCode) = dl.execute(Paths.get("""C:\WorkspaceWeb\repogarden\victims-client\src\test\resources\pom.xml"""))
-    list.foreach((a)=>{logger.debug(a)})
-    assert(Await.result(exitCode, Duration(30, SECONDS)).equals(MvnResult.Success))
+    val dl = DependencyLoader(mvnPath, ExecutionContext.global)
+    val ExecutionResult(ob1, result1) = dl.execute(Paths.get(getClass().getResource("/valid_pom/pom.xml").toURI))
+    ob1.foreach((a)=>{logger.debug(a)})
+
+    val ExecutionResult(ob2, result2) = dl.execute(Paths.get(getClass().getResource("/invalid_pom/pom.xml").toURI))
+    ob2.foreach((a)=>{logger.debug(a)})
+    assert(Await.result(result1, Duration(60, SECONDS)).resultCode.equals(MvnResult.Success))
+    assert(Await.result(result2, Duration(60, SECONDS)).resultCode.equals(MvnResult.Fail))
+    assert(Files.exists(Await.result(result1, Duration(60, SECONDS)).outputPath.get))
+    assert(Await.result(result2, Duration(60, SECONDS)).outputPath.isEmpty)
+    
+    val outputPath = Await.result(result1, Duration(60, SECONDS)).outputPath.get
+    val msgOccurrenceCount = dl.traverseMvnOutput(outputPath, new Visitor[LevelLine,Int]{
+      override var acc = 0
+      override def enter(levelLine: LevelLine){
+        logger.debug(s"enter: $levelLine.toString")
+        acc = acc + 1
+      }
+      override def leave(levelLine: LevelLine){
+        acc = acc + 1
+        logger.debug(s"leave: $levelLine.toString")
+      }
+    })
+    assert(msgOccurrenceCount == 204)
   }
 
   /*

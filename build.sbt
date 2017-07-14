@@ -9,7 +9,9 @@ lazy val commonSettings = Seq(
   libraryDependencies += "org.apache.commons" % "commons-io" % "1.3.2",
   libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
   libraryDependencies += "org.eclipse.mylyn.github" % "org.eclipse.egit.github.core" % "2.1.5",
-    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
+  libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3",
+  libraryDependencies += "io.reactivex" %% "rxscala" % "0.26.5",
+  libraryDependencies += "com.typesafe" % "config" % "1.3.1"
 )
 
 lazy val extractor = (project in file("extractor")).dependsOn(bp).
