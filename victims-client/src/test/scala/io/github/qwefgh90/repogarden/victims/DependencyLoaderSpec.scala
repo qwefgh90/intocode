@@ -48,7 +48,7 @@ import com.typesafe.config.ConfigFactory
 import scala.concurrent.Future
 import scala.concurrent.forkjoin._
 import scala.concurrent.ExecutionContext
-import io.github.qwefgh90.repogarden.victims.maven._
+import io.github.qwefgh90.repogarden.victims.maven.deps._
 import scala.concurrent.duration._
 
 class DependencyLoaderSpec extends FlatSpec with Matchers{

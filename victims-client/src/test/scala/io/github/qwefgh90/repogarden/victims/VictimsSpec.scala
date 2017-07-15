@@ -16,40 +16,9 @@ import com.typesafe.scalalogging._
 
 import io.github.qwefgh90.repogarden.victims.model.JavaModule
 import io.github.qwefgh90.repogarden.victims.model.Victim
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 import java.io.File
 import java.util.Arrays
-
-import org.eclipse.aether.RepositorySystem;
-import org.eclipse.aether.RepositorySystemSession;
-import org.eclipse.aether.artifact.Artifact;
-import org.eclipse.aether.artifact.DefaultArtifact;
-import org.eclipse.aether.collection.CollectRequest;
-import org.eclipse.aether.collection.CollectResult;
-import io.github.qwefgh90.repogarden.victims.util.Booter;
-import io.github.qwefgh90.repogarden.victims.util.ConsoleDependencyGraphDumper;
-
-import org.eclipse.aether.graph._
-import org.eclipse.aether.util.artifact.SubArtifact
-import org.eclipse.aether.DefaultRepositorySystemSession
-import org.eclipse.aether.RepositorySystem
-import org.eclipse.aether.artifact.Artifact
-import org.eclipse.aether.artifact.DefaultArtifact
-import org.eclipse.aether.collection.CollectRequest
-import org.eclipse.aether.collection.CollectResult
-import io.github.qwefgh90.repogarden.victims.util.Booter
-import io.github.qwefgh90.repogarden.victims.util.ConsoleDependencyGraphDumper
-import org.eclipse.aether.resolution.ArtifactDescriptorRequest
-import org.eclipse.aether.resolution.ArtifactDescriptorResult
-import org.eclipse.aether.util.graph.manager.DependencyManagerUtils
-import org.eclipse.aether.util.graph.transformer.ConflictResolver
 import com.typesafe.config.ConfigFactory
-import scala.concurrent.Future
-import scala.concurrent.forkjoin._
-import scala.concurrent.ExecutionContext
-import io.github.qwefgh90.repogarden.victims.maven._
-import scala.concurrent.duration._
 
 class VictimsSpec extends FlatSpec with Matchers{
   private val logger = Logger(classOf[VictimsSpec])
