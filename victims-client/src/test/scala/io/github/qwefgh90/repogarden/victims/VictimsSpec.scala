@@ -16,6 +16,8 @@ import com.typesafe.scalalogging._
 
 import io.github.qwefgh90.repogarden.victims.model.JavaModule
 import io.github.qwefgh90.repogarden.victims.model.Victim
+import io.github.qwefgh90.repogarden.victims.maven.deps._
+import io.github.qwefgh90.repogarden.victims.maven._
 import java.io.File
 import java.util.Arrays
 import com.typesafe.config.ConfigFactory
@@ -28,7 +30,7 @@ class VictimsSpec extends FlatSpec with Matchers{
   else
 	Option(systemToken)
   require(systemTokenOpt.isDefined)
-  
+
   "A victims loader" should "load some files having cve" in {
     assert(VictimsLoader(systemTokenOpt).getFirstPageIteratorOfCommits.size() > 0)
     assert(VictimsLoader(systemTokenOpt).getLatestCveList.size > 20)
@@ -79,47 +81,6 @@ class VictimsSpec extends FlatSpec with Matchers{
     assert(victim.getAffected.get(0) === mod1)
     assert(victim.getAffected.get(1) === mod2)
   }
-  
-  /*
-   "Maven Model" should "return all dependencies" in {
-
-   System.out.println( "------------------------------------------------------------" );
-
-   val system = Booter.newRepositorySystem();
-
-   val session = Booter.newRepositorySystemSession( system );
-
-   session.setConfigProperty( ConflictResolver.CONFIG_PROP_VERBOSE, true );
-   session.setConfigProperty( DependencyManagerUtils.CONFIG_PROP_VERBOSE, true );
-
-   val testartifact = new DefaultArtifact( "io.github.qwefgh90xxxxx:jsearchxxx:0.3.0" );
-   val modelBuilder = new DefaultModelBuilderFactory().newInstance();
-
-   val pomFile = new File(getClass().getResource("/pom.xml").toURI)
-   val modelRequest = new DefaultModelBuildingRequest().setPomFile(pomFile)
-   val model = modelBuilder.buildRawModel(pomFile, ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL, false).get
-   //    model.setParent(null)
-   modelRequest.setRawModel(model)
-   modelRequest.setPomFile(null)
-
-
-   val modelBuildingResult = modelBuilder.build(modelRequest)
-   val mavenDependencies = modelBuildingResult.getEffectiveModel.getDependencies()
-
-   val dp = mavenDependencies.asScala.filter({md => md.getScope == md.getScope}).map(md =>{
-   val dependency = new org.eclipse.aether.graph.Dependency(new DefaultArtifact(md.getGroupId, md.getArtifactId, md.getClassifier, md.getType, md.getVersion), md.getScope)
-   dependency
-   })
-
-   val collectRequest = new CollectRequest();
-   collectRequest.setRootArtifact( testartifact );
-   collectRequest.setDependencies(dp.asJava);
-   collectRequest.setRepositories( Booter.newRepositories( system, session ) );
-
-   val collectResult = system.collectDependencies( session, collectRequest );
-   
-   collectResult.getRoot().accept( new ConsoleDependencyGraphDumper() );
-   }*/
   
   //https://github.com/victims/victims-cve-db/blob/master/database/java/2016/3092.yaml
   "A VictimsLoader" should "scan a vulnerable package" in {

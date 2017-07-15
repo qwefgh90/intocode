@@ -1,8 +1,9 @@
-package io.github.qwefgh90.repogarden.victims.maven.remote
+package io.github.qwefgh90.repogarden.victims.maven
 
 import io.github.qwefgh90.repogarden.victims._
 import io.github.qwefgh90.repogarden.victims.util._
 import io.github.qwefgh90.repogarden.victims.model._
+import scala.collection.JavaConverters._
 
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
@@ -27,27 +28,30 @@ import org.eclipse.aether.resolution.VersionRangeResult;
 import org.eclipse.aether.version.Version;
 
 class Remote {
-  def checkUpdate(groupId: String, artifactId: String): Version = {
-    System.out.println( "------------------------------------------------------------" );
-    val system = Booter.newRepositorySystem();
-
-    val session = Booter.newRepositorySystemSession( system );
-
-    val artifact = new DefaultArtifact( "org.eclipse.aether:aether-util:[0,)" );
-
-    val rangeRequest = new VersionRangeRequest();
-    rangeRequest.setArtifact( artifact );
-    rangeRequest.setRepositories( Booter.newRepositories( system, session ) );
-
-    val rangeResult = system.resolveVersionRange( session, rangeRequest );
-
-    val newestVersion = rangeResult.getHighestVersion();
-
-    System.out.println( "Newest version " + newestVersion + " from repository "
-      + rangeResult.getRepository( newestVersion ) );
-
-    newestVersion
+  def getLastestVersion(groupId: String, artifactId: String): Option[Version] = {
+    val system = Booter.newRepositorySystem()
+    val session = Booter.newRepositorySystemSession( system )
+    val artifact = new DefaultArtifact( s"${groupId}:${artifactId}:[0,)" )
+    val rangeRequest = new VersionRangeRequest()
+    rangeRequest.setArtifact( artifact )
+    rangeRequest.setRepositories( Booter.newRepositories( system, session ) )
+    val rangeResult = system.resolveVersionRange( session, rangeRequest )
+    val newestVersion = rangeResult.getHighestVersion()
+    if(newestVersion == null) Option.empty else Option(newestVersion)
   }
+
+  def getVersionList(groupId: String, artifactId: String): List[Version] = {
+    val system = Booter.newRepositorySystem()
+    val session = Booter.newRepositorySystemSession( system )
+    val artifact = new DefaultArtifact( s"${groupId}:${artifactId}:[0,)" )
+    val rangeRequest = new VersionRangeRequest()
+    rangeRequest.setArtifact( artifact )
+    rangeRequest.setRepositories( Booter.newRepositories( system, session ) )
+    val rangeResult = system.resolveVersionRange( session, rangeRequest )
+    val versions = rangeResult.getVersions()
+    versions.asScala.toList
+  }
+
 }
 
 object Remote{

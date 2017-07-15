@@ -100,25 +100,26 @@ class VictimsLoader(oauthToken: Option[String]) {
 	    val vulerableList = affectedArtifactList.map(artifact => {
 	      val affectedVersionList = artifact._1.getVersion
 	      val issueVersionList = affectedVersionList.asScala.map(versionSet => {
+            val versionPattern: Char => Boolean = (c:Char) => {c == '=' || c == '<' || c == '>'}
 	        val isVulnerable = versionSet.split(",").toList match {
 	          case List(affectedVersion) => {
-	            val operator = affectedVersion.substring(0, affectedVersion.indexOf("=") + 1)
-	            val parsedVersion = affectedVersion.substring(affectedVersion.indexOf("=") + 1)
+	            val operator = affectedVersion.takeWhile(versionPattern)
+	            val parsedVersion = affectedVersion.dropWhile(versionPattern)
 	            operator match {
 	              case "<=" => version.toVersion <= parsedVersion.toVersion
 	              case "==" => version.toVersion == parsedVersion.toVersion
 	              case ">=" => version.toVersion >= parsedVersion.toVersion
-	              case str => throw new RuntimeException("It's invalid operator : " + str)
+	              case str => throw new RuntimeException("It's invalid operator : " + operator + " of " + affectedVersion)
 	            }
 	          }
 	          case List(affectedVersion,series) => {
-	            val operator = affectedVersion.substring(0, affectedVersion.indexOf("=") + 1)
-	            val parsedVersion = affectedVersion.substring(affectedVersion.indexOf("=") + 1)
+	            val operator = affectedVersion.takeWhile(versionPattern)
+	            val parsedVersion = affectedVersion.dropWhile(versionPattern)
 	            operator match {
 	              case "<=" => version.startsWith(series) && version.toVersion <= parsedVersion.toVersion
 	              case "==" => version.startsWith(series) && version.toVersion == parsedVersion.toVersion
 	              case ">=" => version.startsWith(series) && version.toVersion >= parsedVersion.toVersion
-	              case str  => throw new RuntimeException("It's invalid operator : " + str)
+	              case str  => throw new RuntimeException("It's invalid operator : " + operator + " of " + affectedVersion)
 	            }
 	          }
 	          case str =>
@@ -128,7 +129,7 @@ class VictimsLoader(oauthToken: Option[String]) {
 	        if(isVulnerable)
 	          Option(versionSet)
 	        else
-	        	Option.empty
+	          Option.empty
 	        	
 	      }).filter(versionOpt => versionOpt.isDefined)
 	        .map(versionOpt => versionOpt.get).toList

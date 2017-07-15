@@ -51,7 +51,14 @@ package maven {
 
     case class ExecutionResult(log: Observable[String], result: Future[MavenResult]){}
     case class MavenResult(resultCode: MvnResult, outputPath: Option[Path]){}
-    case class LevelLine(seq: Int, level: Int, line: String)
+    case class LevelLine(seq: Int, level: Int, line: String){
+      //org.slf4j:slf4j-log4j12:jar:1.7.10:compile
+      def artifact: Artifact = {
+        val keys = List("groupId", "artifactId", "extension", "version", "scope")
+        val kv = keys.zipAll(line.split(":"),"","").toMap
+        new DefaultArtifact(kv("groupId"), kv("artifactId"), kv("extension"), kv("version"))
+      }
+    }
     case class Found(line: LevelLine, parents: List[LevelLine])
 
     trait Visitor[A,B] {
@@ -135,7 +142,7 @@ package maven {
         val process = builder.start()
 
         /*
-         ReplaySubject is used for not blocking execution infinitely.
+         ReplaySubject is used for not blocking a execution of subprocess infinitely.
          Because some native platforms only provide limited buffer size for standard input and output streams, failure to promptly write the input stream or read the output stream of the subprocess may cause the subprocess to block, or even deadlock. https://docs.oracle.com/javase/7/docs/api/java/lang/Process.html#getInputStream()
          */
         val br = new BufferedReader(new InputStreamReader(process.getInputStream()))
@@ -157,61 +164,12 @@ package maven {
         }
         )
       }
-
-      /*  def execute(pomPath: Path): Iterator[String] = {
-       val source = Source.fromFile(pomPath.toFile)
-       source.getLines
-       }*/
-
-      /*    Future {
-       blocking({
-       ""
-       })
-       }*/
-
-
     }
-
-
-
     object DependencyLoader {
 
       def apply(mvnPath: Path, ec: ExecutionContext): DependencyLoader = {
         return new DependencyLoader(mvnPath, ec)
       }
-
-      /**
-        * work with DependencyVisitor
-        */
-      /*  def getCollectResult(path: Path, visitor: DependencyVisitor): Boolean = {
-       val system = Booter.newRepositorySystem();
-       val session = Booter.newRepositorySystemSession( system );
-       session.setConfigProperty( ConflictResolver.CONFIG_PROP_VERBOSE, true );
-       session.setConfigProperty( DependencyManagerUtils.CONFIG_PROP_VERBOSE, true );
-
-	   val modelBuilder = new DefaultModelBuilderFactory().newInstance();
-
-       val pomFile = path.toFile
-       val modelRequest = new DefaultModelBuildingRequest()
-       modelRequest.setPomFile(pomFile)
-       val modelBuildingResult = modelBuilder.build(modelRequest)
-       val mavenDependencies = modelBuildingResult.getEffectiveModel.getDependencies
-
-       val dp = mavenDependencies.asScala.map(md => {
-       val dependency = new org.eclipse.aether.graph.Dependency(new DefaultArtifact(md.getGroupId, md.getArtifactId, md.getClassifier, md.getType, md.getVersion), md.getScope)
-       dependency
-       })
-
-       val collectRequest = new CollectRequest()
-       collectRequest.setRootArtifact(new DefaultArtifact( "_:_:_" ))
-       //    collectRequest.setDependencies( descriptorResult.getDependencies() )
-       collectRequest.setDependencies(dp.asJava)
-       //    collectRequest.setManagedDependencies(dp.asJava)
-       collectRequest.setRepositories( Booter.newRepositories( system, session ) )
-       val collectResult = system.collectDependencies( session, collectRequest )
-
-       collectResult.getRoot().accept( visitor );
-       }*/
     }
   }
 }
