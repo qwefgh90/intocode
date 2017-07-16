@@ -63,20 +63,20 @@ class DependencyLoaderSpec extends FlatSpec with Matchers{
     val ExecutionResult(ob1, result1) = dl.execute(Paths.get(getClass().getResource("/valid_pom/pom.xml").toURI))
     
     val mvnResult = Await.result(result1, Duration(60, SECONDS))
-    val source = scala.io.Source.fromFile(mvnResult.outputPath.get.toFile())
-    val lineList = dl.createLevelLineFromMvnOutput(source.getLines).toList
-    val parentList = dl.findParents(lineList, levelLine => {
+
+    val source2 = DependencyTree(mvnResult.outputPath.get)
+    val parentList2 = source2.findParents( levelLine => {
       levelLine.line.contains("org.codehaus.woodstox:stax2-api:jar:3.1.4:compile")
     })
     
-    parentList.foreach(found => {
+    parentList2.foreach(found => {
       logger.debug(s"found: ${found.line}")
       found.parents.foreach({ parent =>
         logger.debug(s"parent: ${parent.line}")
       })
     })
 
-    assert(parentList(0).parents.map(line => line.line).sameElements(
+    assert(parentList2(0).parents.map(line => line.line).sameElements(
       List(
         "org.codehaus.woodstox:woodstox-core-asl:jar:4.4.1:compile"
           ,"org.apache.cxf:cxf-core:jar:3.0.3:compile"
@@ -84,16 +84,13 @@ class DependencyLoaderSpec extends FlatSpec with Matchers{
           ,"org.apache.tika:tika-parsers:jar:1.14:compile"
           ,"io.github.qwefgh90:jsearch:jar:0.2.0")), "Two list must be same.")
 
-    assert(dl.findParents(lineList, levelLine => {
+    assert(source2.findParents(levelLine => {
       levelLine.line.contains("io.github.qwefgh90:jsearch:jar:0.2.0")
     })(0).parents.length == 0, "A size of parent of root must be zero.")
 
-    assert(dl.findParents(lineList, levelLine => {
+    assert(source2.findParents(levelLine => {
       levelLine.line.contains("always return false")
     }).length == 0, "When it can't find levelLine to meet condition, it must return zero.")
-        
-
-    source.close()
   }
 
   "DependencyLoader" should "process valid or invalid pom.xml" in {
@@ -115,7 +112,9 @@ class DependencyLoaderSpec extends FlatSpec with Matchers{
     assert(Await.result(result2, Duration(60, SECONDS)).outputPath.isEmpty)
     
     val outputPath = Await.result(result1, Duration(60, SECONDS)).outputPath.get
-    val msgOccurrenceCount = dl.traverseMvnOutput(outputPath, new Visitor[LevelLine,Int]{
+    val tree = DependencyTree(outputPath)
+
+    val msgOccurrenceCount = tree.traverseLevelLines(new Visitor[LevelLine,Int]{
       override var acc = 0
       override def enter(levelLine: LevelLine, stack: List[LevelLine]){
         logger.debug(s"enter: ${levelLine.toString}")

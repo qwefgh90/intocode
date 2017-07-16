@@ -12,6 +12,12 @@ import org.eclipse.aether.version._
 import com.typesafe.scalalogging._
 
 object Implicits {
+
+  trait Node
+  case class TreeNode(get: RepositoryContents, children: List[Node]) extends Node { }
+  case class TerminalNode(get: RepositoryContents) extends Node { }
+  case class Root(children: List[Node]) {}
+
   class ContentsServiceEx(contentsService: ContentsService){
     private val logger = Logger(classOf[ContentsServiceEx])
 	/**
@@ -39,6 +45,20 @@ object Implicits {
 		  List(content)
 	  }
 	}
+
+	def getContentsTree(repoProvider: IRepositoryIdProvider, rootPath: String, ref: String): Root = {
+      def go(path: String): List[Node] = {
+	    val contentList = contentsService.getContents(repoProvider, path, ref).asScala.toList
+	    val wrappedList = contentList.map{content =>
+		  if(content.getType == RepositoryContents.TYPE_DIR)
+		    TreeNode(content, go(content.getPath))
+		  else
+		    TerminalNode(content)
+	    }
+        wrappedList
+      }
+      Root(go(rootPath))
+	}
   }
   
   class RepositoryContentsEx(repositoryContent: RepositoryContents){
@@ -55,45 +75,7 @@ object Implicits {
   	  content
   	}
   }
-  
-  class VersionString(versionStr: String) extends Ordered[VersionString]{
-	val version = versionStr.trim()
-	def compare(that: VersionString) = {
-	  val target = that.version
-	  val versionNumberList = version.split("\\.").toList.filter(component => {Try(component.toInt).isSuccess})
-	  val targetVersionNumberList = target.split("\\.").toList.filter(component => Try(component.toInt).isSuccess)
-	  val zippedList = versionNumberList.zipAll(targetVersionNumberList, "0", "0")
-	  zippedList.foldLeft(0)((result: Int, tuple) => {
-	    val comp1 = tuple._1.toInt
-	    val comp2 = tuple._2.toInt
-	    if(result == 0)
-	      comp1.compare(comp2)
-	    else
-	      result
-	  })
-	}
-	
-	override def equals(other: Any) = {
-	  other match {
-	    case that: VersionString => {
-	      val target = that.version
-	      val versionNumberList = version.split("\\.").toList.filter(component => {Try(component.toInt).isSuccess})
-	      val targetVersionNumberList = target.split("\\.").toList.filter(component => Try(component.toInt).isSuccess)
-	      val zippedList = versionNumberList.zipAll(targetVersionNumberList, "0", "0")
-	      val equality = zippedList.forall((tuple) => { tuple._1 == tuple._2 })
-	      (that.canEqual(this)
-	        && equality)
-	    }
-	    case _ => false
-	  }
-	}
-	
-	override def hashCode: Int = this.version.hashCode
-	
-	def canEqual(other: Any): Boolean = {
-	  other.isInstanceOf[VersionString]
-	}
-  }
+
   val scheme = new GenericVersionScheme()
 
   class VersionWrapper(versionStr: String) extends Ordered[VersionWrapper]{
@@ -115,7 +97,7 @@ object Implicits {
 	override def hashCode: Int = this.version.hashCode
 	
 	def canEqual(other: Any): Boolean = {
-	  other.isInstanceOf[VersionString]
+	  other.isInstanceOf[VersionWrapper]
 	}
   }
 
