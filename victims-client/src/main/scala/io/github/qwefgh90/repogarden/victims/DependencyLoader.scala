@@ -51,8 +51,76 @@ package maven {
 
     case class ExecutionResult(log: Observable[String], result: Future[MavenResult]){}
     case class MavenResult(resultCode: MvnResult, outputPath: Option[Path]){}
+
+    object DependencyTree {
+      def apply(mvnOutputPath: Path) = {
+        new DependencyTree(createLevelLineFromMvnOutput(mvnOutputPath).toList)
+      }
+
+      def apply(mvnOutput: Iterator[String]) = {
+        new DependencyTree(createLevelLineFromMvnOutput(mvnOutput).toList)
+      }
+
+      def createLevelLineFromMvnOutput(iterator: Iterator[String]): Iterator[LevelLine] = {
+        val headLevelPattern = (ch: Char) => (ch == ' ' || ch == '+' || ch == '-' || ch == '|' || ch == '\\')
+        iterator.zipWithIndex.map(zip => LevelLine(zip._2 + 1, zip._1.takeWhile(headLevelPattern).length()/3, zip._1.dropWhile(headLevelPattern)))
+      }
+
+      def createLevelLineFromMvnOutput(path: Path): Iterator[LevelLine] = {
+        val source = Source.fromFile(path.toFile)
+        try{
+          createLevelLineFromMvnOutput(source.getLines)
+        }finally{
+          source.close()
+        }
+      }
+    }
+    class DependencyTree private (val levelLines: List[LevelLine]) {
+      def findParents(contain: LevelLine => Boolean): List[Found] = {
+        traverseLevelLines(new Visitor[LevelLine, List[Found]] {
+          override var acc: List[Found] = Nil
+          override def enter(levelLine: LevelLine, stack: List[LevelLine]){
+            if(contain(levelLine))
+              acc = (Found(levelLine, stack) :: acc)
+          }
+          override def leave(levelLine: LevelLine){}
+        })
+      }
+
+      def traverseLevelLines[A >: LevelLine, B](visitor: Visitor[A,B]): B = {
+        val levelIterator = levelLines.toIterator
+        @tailrec def go(seq: Int, iterator: Iterator[LevelLine], stack: List[LevelLine]) {
+          if(iterator.hasNext){
+            val selected = iterator.next
+            val LevelLine(seq, level, line) = selected
+            val nextStack = if(stack.nonEmpty){
+              val LevelLine(seq, lastLevel, lastLine) = stack.head
+              val removed = if(lastLevel >= level)
+                stack.take(lastLevel - level + 1)
+              else
+                Nil
+
+              removed.foreach(e => {visitor.leave(e)}) //leave
+              visitor.enter(selected, stack.drop(removed.length))//enter
+
+              selected :: stack.drop(removed.length)
+            }else{
+              visitor.enter(selected, stack)//enter
+              val newStack = selected :: Nil
+              newStack
+            }
+            go(seq+1, iterator, nextStack)
+          }else{
+            stack.foreach(v => visitor.leave(v))//leave remainings
+          }
+          
+        }
+        go(1, levelIterator, Nil)
+        visitor.acc
+      }
+
+    }
     case class LevelLine(seq: Int, level: Int, line: String){
-      //org.slf4j:slf4j-log4j12:jar:1.7.10:compile
       def artifact: Artifact = {
         val keys = List("groupId", "artifactId", "extension", "version", "scope")
         val kv = keys.zipAll(line.split(":"),"","").toMap
@@ -81,6 +149,15 @@ package maven {
       })
       }
 
+      def createLevelLineFromMvnOutput(path: Path): Iterator[LevelLine] = {
+        val source = Source.fromFile(path.toFile)
+        try{
+          createLevelLineFromMvnOutput(source.getLines)
+        }finally{
+          source.close()
+        }
+      }
+ 
       def createLevelLineFromMvnOutput(iterator: Iterator[String]): Iterator[LevelLine] = {
         val headLevelPattern = (ch: Char) => (ch == ' ' || ch == '+' || ch == '-' || ch == '|' || ch == '\\')
         iterator.zipWithIndex.map(zip => LevelLine(zip._2 + 1, zip._1.takeWhile(headLevelPattern).length()/3, zip._1.dropWhile(headLevelPattern)))
