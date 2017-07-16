@@ -100,7 +100,7 @@ package maven {
         traverseLevelLines(levelIterator, visitor)
       }
 
-      def traverseLevelLines[A >: LevelLine, B](levelIterator: Iterator[LevelLine], visitor: Visitor[A,B]): B = {
+      private def traverseLevelLines[A >: LevelLine, B](levelIterator: Iterator[LevelLine], visitor: Visitor[A,B]): B = {
         @tailrec def go(seq: Int, iterator: Iterator[LevelLine], stack: List[LevelLine]) {
           if(iterator.hasNext){
             val selected = iterator.next
