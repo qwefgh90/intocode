@@ -13,10 +13,36 @@ import com.typesafe.scalalogging._
 
 object Implicits {
 
-  trait Node
-  case class TreeNode(get: RepositoryContents, children: List[Node]) extends Node { }
-  case class TerminalNode(get: RepositoryContents) extends Node { }
-  case class Root(children: List[Node]) {}
+  trait Visitor[A,B] {
+    var acc: B
+    def enter(a:A, stack:List[A])
+    def leave(a:A)
+  }
+  abstract class Node(val get: RepositoryContents)
+  object NilNode extends Node(new RepositoryContents)
+  case class TreeNode(override val get: RepositoryContents, children: List[Node]) extends Node(get)
+  case class TerminalNode(override val get: RepositoryContents) extends Node(get)
+  case class Tree(children: List[Node]) {
+    def traverse[B](visitor: Visitor[Node, B]): B = {
+      def go(node: Node, stack: List[Node]): Unit = node match {
+        case terminalNode: TerminalNode => {
+          visitor.enter(terminalNode, stack)
+          visitor.leave(terminalNode)
+        }
+        case treeNode: TreeNode => {
+          visitor.enter(treeNode, stack)
+          treeNode.children.foreach(child => {
+            go(child, treeNode::stack)
+          })
+          visitor.leave(treeNode)
+        }
+      }
+      children.foreach(child => {
+        go(child, Nil)
+      })
+      visitor.acc
+    }
+  }
 
   class ContentsServiceEx(contentsService: ContentsService){
     private val logger = Logger(classOf[ContentsServiceEx])
@@ -46,7 +72,7 @@ object Implicits {
 	  }
 	}
 
-	def getContentsTree(repoProvider: IRepositoryIdProvider, rootPath: String, ref: String): Root = {
+	def getContentsTree(repoProvider: IRepositoryIdProvider, rootPath: String, ref: String): Tree = {
       def go(path: String): List[Node] = {
 	    val contentList = contentsService.getContents(repoProvider, path, ref).asScala.toList
 	    val wrappedList = contentList.map{content =>
@@ -57,7 +83,7 @@ object Implicits {
 	    }
         wrappedList
       }
-      Root(go(rootPath))
+      Tree(go(rootPath))
 	}
   }
   

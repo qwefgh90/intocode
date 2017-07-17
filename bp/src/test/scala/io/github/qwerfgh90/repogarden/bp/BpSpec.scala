@@ -26,28 +26,23 @@ class BpSpec extends FlatSpec with Matchers{
 	githubClient
   }
   
-
   "Github api" should "get tree structure" in {
 	val contentService = new ContentsService(client)
 	val repositoryService = new RepositoryService(client)
 	val commitService = new CommitService(client)
     val repository = repositoryService.getRepository("victims", "victims-cve-db")
-	val root = contentService.getContentsTree(repository, "database/java", "heads/master")
-
-    def print(node: Node){
-      if(node.isInstanceOf[TreeNode]){
-        logger.debug(node.asInstanceOf[TreeNode].get.getName)
-        node.asInstanceOf[TreeNode].children.foreach(child =>{
-          print(child)
-        })
-      }else{
-        logger.debug(node.asInstanceOf[TerminalNode].get.getName)
+	val tree = contentService.getContentsTree(repository, "database/java", "heads/master")
+    tree.traverse(new Visitor[Node, Unit]{
+      override var acc: Unit = Unit
+      override def enter(n: Node, stack: List[Node]) = n match {
+        case node: TreeNode => println(s"dir:${stack.headOption.getOrElse(NilNode).get.getName}/${node.get.getName} ")
+        case node: TerminalNode => println(s"node:${stack.headOption.getOrElse(NilNode).get.getName}/${node.get.getName} ")
       }
-    }
-    root.children.foreach(node => {
-      print(node)
+      override def leave(n: Node){
+      }
     })
-    assert(root.children.length >= 10, "A qcount of tree must be more than 9")
+
+    assert(tree.children.length >= 10, "A count of nodes must be more than 9")
   }
 
   "Github api" should "get trees of commits" in {
