@@ -52,15 +52,11 @@ class IntegrationSpec extends FlatSpec with Matchers{
     val outputPath = path.get
 
     val tree = DependencyTree(outputPath)
-
-//    val source = Source.fromFile(outputPath.toFile)
-//    val lines = loader.createLevelLineFromMvnOutput(source.getLines)
     val vulLines = tree.levelLines.collect(
       {case line if victim.scanSingleArtifact(line.artifact.getGroupId, line.artifact.getArtifactId, line.artifact.getVersion).isDefined => line
       }
     ).toList
     vulLines.foreach(l => logger.debug(s"vulerable artifact: ${l.toString}"))
     assert(vulLines.length >= 2, "It should find artifacts equal to or more than 2")
-//    source.close()
   }
 }

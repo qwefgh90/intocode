@@ -114,7 +114,7 @@ class DependencyLoaderSpec extends FlatSpec with Matchers{
     val outputPath = Await.result(result1, Duration(60, SECONDS)).outputPath.get
     val tree = DependencyTree(outputPath)
 
-    val msgOccurrenceCount = tree.traverseLevelLines(new Visitor[LevelLine,Int]{
+    val msgOccurrenceCount = tree.traverseLevelLines(new io.github.qwefgh90.repogarden.victims.maven.deps.Visitor[LevelLine,Int]{
       override var acc = 0
       override def enter(levelLine: LevelLine, stack: List[LevelLine]){
         logger.debug(s"enter: ${levelLine.toString}")

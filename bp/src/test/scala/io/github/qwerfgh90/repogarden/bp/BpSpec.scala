@@ -5,7 +5,7 @@ import org.scalatest.FlatSpec
 import com.typesafe.scalalogging.Logger
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
 import scala.collection.JavaConverters._
-
+import java.nio.file._
 import org.eclipse.egit.github.core.client._
 import org.eclipse.egit.github.core.service._
 
@@ -25,11 +25,26 @@ class BpSpec extends FlatSpec with Matchers{
 	}
 	githubClient
   }
-  
-  "Github api" should "get tree structure" in {
+
+  "Github util" should "create temp directory structure" in {
 	val contentService = new ContentsService(client)
 	val repositoryService = new RepositoryService(client)
 	val commitService = new CommitService(client)
+    val dataService = new DataService(client)
+    val repository = repositoryService.getRepository("victims", "victims-cve-db")
+	val tree = contentService.getContentsTree(repository, "database/java", "heads/master")
+    tree.syncContents(repository, dataService)
+    val tempPath = Files.createTempDirectory(s"test_${System.currentTimeMillis().toString}")
+    tree.writeToFileSystem(tempPath, Option.empty)
+    logger.debug(s"File structure in '${tempPath}' is created from a remote")
+    assert(Files.size(tempPath) >= 10)
+  }
+  
+  "Github util" should "get tree structure" in {
+	val contentService = new ContentsService(client)
+	val repositoryService = new RepositoryService(client)
+	val commitService = new CommitService(client)
+    val dataService = new DataService(client)
     val repository = repositoryService.getRepository("victims", "victims-cve-db")
 	val tree = contentService.getContentsTree(repository, "database/java", "heads/master")
     tree.traverse(new Visitor[Node, Unit]{

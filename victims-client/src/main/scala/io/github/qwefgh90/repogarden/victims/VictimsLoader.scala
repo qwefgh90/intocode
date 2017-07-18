@@ -74,7 +74,7 @@ class VictimsLoader(oauthToken: Option[String]) {
 	    lastCommit = lastRemoteCommit
 	    val repositoryContentList = contentService.getContents(repository, "database/java", "heads/master", true)
 	    repositoryContentList.foreach(repositoryContent => {
-          repositoryContent.setContent(repositoryContent.getContentSync(repository, dataService))
+          repositoryContent.syncContent(repository, dataService)
 	    })
 	    contentList.clear()
 	    contentList ++= repositoryContentList.map(repositoryContent => {
