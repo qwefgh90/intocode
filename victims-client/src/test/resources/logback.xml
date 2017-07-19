@@ -19,6 +19,8 @@
     <appender-ref ref="STDOUT" />
   </appender>
 
+  <logger name="io.github.qwefgh90.repogarden.bp.github.Implicits" level="TRACE"/>
+
   <root level="DEBUG">
     <appender-ref ref="STDOUT" />
   </root>

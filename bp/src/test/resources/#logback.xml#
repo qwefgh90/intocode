@@ -18,6 +18,7 @@
   <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
     <appender-ref ref="STDOUT" />
   </appender>
+
   <root level="DEBUG">
     <appender-ref ref="STDOUT" />
   </root>

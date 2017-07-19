@@ -15,106 +15,29 @@ import java.nio.file.StandardOpenOption._
 import java.io._
 import com.typesafe.scalalogging._
 
-object Implicits {
+object Implicits extends Tree2 { 
 
   private val logger = Logger(Implicits.getClass)
   
   /**
 	* A converter from ContentsService to ContentsServiceEx
+	* A converter from ContentsService to StringEx
 	*/
   implicit def extendContentsService(service: ContentsService) = new ContentsServiceEx(service)
   implicit def extendString(str: String) = new StringEx(str)
 
-  trait Visitor[A,B] {
-    var acc: B
-    def enter(a:A, stack:List[A])
-    def leave(a:A)
-  }
-
-  abstract class Node(val get: RepositoryContentsExtend)
-  object NilNode extends Node(new RepositoryContentsExtend)
-  case class TreeNode(override val get: RepositoryContentsExtend, children: List[Node]) extends Node(get)
-  case class TerminalNode(override val get: RepositoryContentsExtend) extends Node(get)
-  case class Tree(children: List[Node]) {
-    def traverse[B](visitor: Visitor[Node, B]): B = {
-      def go(node: Node, stack: List[Node]): Unit = node match {
-        case terminalNode: TerminalNode => {
-          visitor.enter(terminalNode, stack)
-          visitor.leave(terminalNode)
-        }
-        case treeNode: TreeNode => {
-          visitor.enter(treeNode, stack)
-          treeNode.children.foreach(child => {
-            go(child, treeNode::stack)
-          })
-          visitor.leave(treeNode)
-        }
-      }
-      children.foreach(child => {
-        go(child, Nil)
-      })
-      visitor.acc
-    }
-
-    def syncContents(repository: Repository, dataService: DataService) = {
-      val visitor = new Visitor[Node, Unit]{
-        override var acc: Unit = Unit
-        override def enter(node: Node, stack: List[Node]) =
-          node match {
-            case node: TerminalNode =>
-              node.get.syncContent(repository, dataService)
-            case _ =>
-          }
-        override def leave(node: Node){
-        }
-      }
-      traverse(visitor)
-    }
-
-    def writeToFileSystem(dir: Path, filter: Option[Node => Boolean]): Path = {
-      val visitor = new Visitor[Node, Path]{
-        override var acc: Path = dir
-        override def enter(node: Node, stack: List[Node]){
-          val parentPath = dir.resolve(stack.reverse.map(node => node.get.getName).mkString(java.io.File.separator))
-          if(filter.isDefined && filter.get(node)){
-            logger.debug(s"in ${node.get.getPath}, ${node.get.getName} is filtered.")
-          }else{
-            node match {
-              case node: TreeNode => {
-                val directory = parentPath.resolve(node.get.getName)
-                if(!Files.exists(directory)){
-                  Files.createDirectories(directory)
-                }
-              }
-              case node: TerminalNode => {
-                if(!Files.exists(parentPath)){
-                  Files.createDirectories(parentPath)
-                }
-                val exNode = node.get
-                val file = parentPath.resolve(node.get.getName)
-                if(!Files.exists(file)){
-                  val out = new BufferedOutputStream(Files.newOutputStream(file, CREATE, APPEND))
-                  try{
-                    out.write(exNode.getBytes, 0, exNode.getBytes.length);
-                  } finally{
-                    out.close()
-                  }
-                }
-              }
-            }
-          }
-        }
-        override def leave(node: Node){}
-      }
-      traverse(visitor)
-    }
-  }
-
+  /*
+   * A extension of org.eclipse.egit.github.core.service.ContentsService
+   * It adds some recursive functions
+   * And a special function to return simple git object tree of remote a repository.
+   * You should import io.github.qwefgh90.repogarden.bp.github.Implicit which is a object
+   */
   class ContentsServiceEx(contentsService: ContentsService){
     private val logger = Logger(classOf[ContentsServiceEx])
 	/**
 	  * @param repoProvider repository provider
-	  * @param path if path is null, iterate contents from root. Otherwise, iterate contents from path
+	  * @param path if path is null, It iterates contents from root. Otherwise, It iterates contents from path
+      * @param ref It's sha or a head
 	  * @param recursive whether to iterate all sub directories
 	  * @return a list of contents
 	  */
@@ -138,24 +61,47 @@ object Implicits {
 	  }.map(content => new RepositoryContentsExtend(content))
 	}
 
-	def getContentsTree(repoProvider: IRepositoryIdProvider, rootPath: String, ref: String): Tree = {
+	/**
+	  * @param repoProvider repository provider
+	  * @param rootPath if path is null, It iterates contents from root. Otherwise, It iterates contents from path
+	  * @param ref It's sha or a head
+	  * @return a instance of Tree 
+	  */
+/*	def getContentsTree(repoProvider: IRepositoryIdProvider, rootPath: String, ref: String, filter: PartialFunction[Node, Boolean] = {case _ => true}): Tree = {
+      val safeFilter: PartialFunction[Node, Boolean] = {
+        case node: TreeNode => if(!filter.isDefinedAt(node)) true else filter(node)
+        case node: TerminalNode => if(!filter.isDefinedAt(node)) true else filter(node)
+        case _ => true
+      }
+
       def go(path: String): List[Node] = {
+        logger.trace(s"try to get contents in ${path}")
 	    val contentList = contentsService.getContents(repoProvider, path, ref).asScala.toList
 	    val wrappedList = contentList
           .map(content => new RepositoryContentsExtend(content))
-          .map{content =>
-		  if(content.getType == RepositoryContents.TYPE_DIR)
-		    TreeNode(content, go(content.getPath))
-		  else{
-            TerminalNode(content)
-          }
-	    }
+          .flatMap{content =>
+		    if(content.getType == RepositoryContents.TYPE_DIR)
+		      List(TreeNode(content, go(content.getPath)))
+		    else{
+              val terminal = TerminalNode(content)
+              if(safeFilter(terminal))
+                List(terminal)
+              else
+                List()
+            }
+	      }
         wrappedList
       }
       Tree(go(rootPath))
-	}
+	}*/
   }
 
+  /*
+   * A sub class of org.eclipse.egit.github.core.RepositoryContents.
+   * Basically, RepositoryContents does not provide a content field.
+   * So, it adds a function for synchrizing a content of remote, which take a long time.
+   * To construct a instance, a instance of RepositoryContents is necessary.
+   */
   class RepositoryContentsExtend(base: RepositoryContents) extends RepositoryContents{
     this.setSha(base.getSha)
     this.setType(base.getType)

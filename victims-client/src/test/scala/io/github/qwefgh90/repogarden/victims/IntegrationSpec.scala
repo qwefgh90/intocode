@@ -12,6 +12,12 @@ import org.yaml.snakeyaml._
 import org.yaml.snakeyaml.constructor.Constructor
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
 
+import org.eclipse.egit.github.core.Blob
+import org.eclipse.egit.github.core.RepositoryCommit
+import org.eclipse.egit.github.core.RepositoryContents
+import org.eclipse.egit.github.core.TreeEntry
+import org.eclipse.egit.github.core.client._
+import org.eclipse.egit.github.core.service._
 import com.typesafe.scalalogging._
 
 import io.github.qwefgh90.repogarden.victims.model.JavaModule
@@ -36,7 +42,22 @@ class IntegrationSpec extends FlatSpec with Matchers{
   import scala.concurrent._
   import java.util.concurrent._
 
-  "A victims loader" should "find vulnerables from pom.xml" in {
+  "A dependency loader" should "load tree from remote pom.xml" in {
+	val githubClient = new GitHubClient()
+	githubClient.setOAuth2Token(systemTokenOpt.get)
+    val contentService = new ContentsService(githubClient)
+    val repoService = new RepositoryService(githubClient)
+    val dataService = new DataService(githubClient)
+    val repo = repoService.getRepository("apache", "spark")
+    val tree = contentService.getContentsTree(repo, "", "heads/master", {case node: TerminalNode => if(node.get.getName.contains("pom.xml")) true else false })
+    tree.syncContents(repo, dataService: DataService)
+    val dir = Files.createTempDirectory(s"temp_${System.currentTimeMillis.toString}")
+    tree.writeToFileSystem(dir, {case node: TerminalNode => node.get.getName.contains("pom.xml")})
+    logger.debug(s"spark temp dir: ${dir.toAbsolutePath().toString}")
+    assert(Files.list(dir).count() > 0)
+  }
+
+/*  "A victims loader" should "find vulnerables from local pom.xml" in {
     val conf = ConfigFactory.load("victims_client.conf")
     val mvnPath = Paths.get(conf.getString("maven.path"))
     require(Files.exists(mvnPath), s"${mvnPath.toAbsolutePath.toString} does not exists.")
@@ -58,5 +79,5 @@ class IntegrationSpec extends FlatSpec with Matchers{
     ).toList
     vulLines.foreach(l => logger.debug(s"vulerable artifact: ${l.toString}"))
     assert(vulLines.length >= 2, "It should find artifacts equal to or more than 2")
-  }
+  }*/
 }
