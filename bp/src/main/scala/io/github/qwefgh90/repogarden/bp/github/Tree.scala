@@ -18,6 +18,8 @@ import io.github.qwefgh90.repogarden.bp.github.Implicits._
 
 trait Tree2 {
   private val logger = Logger(classOf[Tree2])
+  val TYPE_TREE = TreeEntry.TYPE_TREE
+  val TYPE_BLOB = TreeEntry.TYPE_BLOB
 
   trait Visitor[A,B] {
     var acc: B
@@ -85,7 +87,17 @@ trait Tree2 {
   }
 
   class GitTree private (val list: List[TreeEntryEx]) {
-
+    def filter(f:TreeEntryEx => Boolean) = {
+      new GitTree(list.filter(f))
+    }
+    def shorten(pathComponents: Array[String]) = {
+      val newLevel = pathComponents.length
+      val pathString = pathComponents.mkString("/")
+      val reducedTree = list.filter(e => e.entry.getPath.startsWith(pathString) && !e.entry.getPath.equals(pathString))
+        .zipWithIndex
+        .map(tuple => new TreeEntryEx(tuple._2, tuple._1.level - newLevel, tuple._1.name, tuple._1.entry))
+      new GitTree(reducedTree)
+    }
     def traverse[B](visitor: Visitor[TreeEntryEx,B]): B = {
       val levelIterator = list.toIterator
       @annotation.tailrec

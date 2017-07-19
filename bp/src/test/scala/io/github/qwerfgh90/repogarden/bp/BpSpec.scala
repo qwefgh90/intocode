@@ -63,7 +63,7 @@ class BpSpec extends FlatSpec with Matchers{
     val list = repositoryService.getBranches(repository).asScala
     val sha = list.find(_.getName=="master").get.getCommit.getSha
     val rawTree = dataService.getTree(repository, sha, true)
-	val tree = GitTree(rawTree)
+	val tree = GitTree(rawTree).shorten(Array("database","java"))
     import org.eclipse.egit.github.core._
     tree.syncContents(repository, dataService)
     val tempPath = Files.createTempDirectory(s"test_${System.currentTimeMillis().toString}")
@@ -74,9 +74,9 @@ class BpSpec extends FlatSpec with Matchers{
         false
     })
     logger.debug(s"A filtered structure in '${tempPath}' is created from a remote")
-    //assert(Files.list(tempPath).count == 1)
+    assert(Files.list(tempPath).count == 1)
   }
-
+ 
   "Github util" should "create temp directory structure" in {
 	val contentService = new ContentsService(client)
 	val repositoryService = new RepositoryService(client)
@@ -86,12 +86,12 @@ class BpSpec extends FlatSpec with Matchers{
     val list = repositoryService.getBranches(repository).asScala
     val sha = list.find(_.getName=="master").get.getCommit.getSha
     val rawTree = dataService.getTree(repository, sha, true)
-	val tree = GitTree(rawTree)
+	val tree = GitTree(rawTree).shorten(Array("database","java"))
     tree.syncContents(repository, dataService)
     val tempPath = Files.createTempDirectory(s"test_${System.currentTimeMillis().toString}")
     tree.writeToFileSystem(tempPath)
     logger.debug(s"File structure in '${tempPath}' is created from a remote")
-    //assert(Files.list(tempPath).count >= 10)
+    assert(Files.list(tempPath).count >= 10)
   }
   
   "Github util" should "get tree structure" in {
@@ -103,19 +103,18 @@ class BpSpec extends FlatSpec with Matchers{
     val list = repositoryService.getBranches(repository).asScala
     val sha = list.find(_.getName=="master").get.getCommit.getSha
     val rawTree = dataService.getTree(repository, sha, true)
-	val tree = GitTree(rawTree)
+	val tree = GitTree(rawTree).shorten(Array("database","java"))
     import org.eclipse.egit.github.core._
     tree.traverse(new Visitor[TreeEntryEx, Unit]{
       override var acc: Unit = Unit
-      override def enter(n: TreeEntryEx, stack: List[TreeEntryEx]) = n.entry.getType match {
-        case TreeEntry.TYPE_TREE => println(s"tree:${n.entry.getPath} ")
-        case TreeEntry.TYPE_BLOB => println(s"blob:${n.entry.getPath} ")
+      override def enter(e: TreeEntryEx, stack: List[TreeEntryEx]) = e.entry.getType match {
+        case TreeEntry.TYPE_TREE => println(s"tree: ${e.level}, ${stack.reverse.map(_.name).mkString("/")}, ${e.name} ")
+        case TreeEntry.TYPE_BLOB => println(s"blob: ${e.level}, ${stack.reverse.map(_.name).mkString("/")}, ${e.name} ")
       }
-      override def leave(n: TreeEntryEx){
+      override def leave(e: TreeEntryEx){
       }
     })
-
-    //assert(tree.list.count( _.entry.getType == TreeEntry.TYPE_TREE ) >= 10, "A count of nodes must be more than 9")
+    assert(tree.list.count( _.entry.getType == TYPE_TREE ) >= 10, "A count of nodes must be more than 9")
   }
 
   "Github api" should "get trees of commits" in {

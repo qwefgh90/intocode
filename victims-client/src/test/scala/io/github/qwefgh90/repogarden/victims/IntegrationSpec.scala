@@ -48,11 +48,15 @@ class IntegrationSpec extends FlatSpec with Matchers{
     val contentService = new ContentsService(githubClient)
     val repoService = new RepositoryService(githubClient)
     val dataService = new DataService(githubClient)
+    val repository = repoService.getRepository("apache", "spark")
+    val list = repoService.getBranches(repository).asScala
+    val sha = list.find(_.getName=="master").get.getCommit.getSha
     val repo = repoService.getRepository("apache", "spark")
-    val tree = contentService.getContentsTree(repo, "", "heads/master", {case node: TerminalNode => if(node.get.getName.contains("pom.xml")) true else false })
-    tree.syncContents(repo, dataService: DataService)
+    val rawTree = dataService.getTree(repository, sha, true)
+	val tree = GitTree(rawTree).filter(e => e.entry.getType == TYPE_TREE || e.name == "pom.xml")
+    tree.syncContents(repo, dataService)
     val dir = Files.createTempDirectory(s"temp_${System.currentTimeMillis.toString}")
-    tree.writeToFileSystem(dir, {case node: TerminalNode => node.get.getName.contains("pom.xml")})
+    tree.writeToFileSystem(dir)
     logger.debug(s"spark temp dir: ${dir.toAbsolutePath().toString}")
     assert(Files.list(dir).count() > 0)
   }

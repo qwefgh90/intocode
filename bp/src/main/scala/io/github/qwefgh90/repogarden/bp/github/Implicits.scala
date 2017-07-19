@@ -60,40 +60,6 @@ object Implicits extends Tree2 {
 		  List(content)
 	  }.map(content => new RepositoryContentsExtend(content))
 	}
-
-	/**
-	  * @param repoProvider repository provider
-	  * @param rootPath if path is null, It iterates contents from root. Otherwise, It iterates contents from path
-	  * @param ref It's sha or a head
-	  * @return a instance of Tree 
-	  */
-/*	def getContentsTree(repoProvider: IRepositoryIdProvider, rootPath: String, ref: String, filter: PartialFunction[Node, Boolean] = {case _ => true}): Tree = {
-      val safeFilter: PartialFunction[Node, Boolean] = {
-        case node: TreeNode => if(!filter.isDefinedAt(node)) true else filter(node)
-        case node: TerminalNode => if(!filter.isDefinedAt(node)) true else filter(node)
-        case _ => true
-      }
-
-      def go(path: String): List[Node] = {
-        logger.trace(s"try to get contents in ${path}")
-	    val contentList = contentsService.getContents(repoProvider, path, ref).asScala.toList
-	    val wrappedList = contentList
-          .map(content => new RepositoryContentsExtend(content))
-          .flatMap{content =>
-		    if(content.getType == RepositoryContents.TYPE_DIR)
-		      List(TreeNode(content, go(content.getPath)))
-		    else{
-              val terminal = TerminalNode(content)
-              if(safeFilter(terminal))
-                List(terminal)
-              else
-                List()
-            }
-	      }
-        wrappedList
-      }
-      Tree(go(rootPath))
-	}*/
   }
 
   /*
