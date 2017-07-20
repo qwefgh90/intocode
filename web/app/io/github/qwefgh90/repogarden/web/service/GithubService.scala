@@ -9,7 +9,7 @@ import scala.collection.JavaConverters._
 
 class GithubService (accessToken: String) {
   private lazy val client = {
-    val client = new GitHubClient()
+    val client = new GitHubClient()    
     client.setOAuth2Token(accessToken)
   }
   private lazy val contentsService = {

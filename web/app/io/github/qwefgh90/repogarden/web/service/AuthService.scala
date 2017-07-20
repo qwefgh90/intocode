@@ -76,9 +76,9 @@ class Encryption @Inject() (configuration: Configuration){
   }
   
   def decrypt(encrypted: Array[Byte]): Array[Byte] = {
-		val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-		cipher.init(Cipher.DECRYPT_MODE, key, ivSpec)
-	  cipher.doFinal(encrypted)
+	val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+	cipher.init(Cipher.DECRYPT_MODE, key, ivSpec)
+	cipher.doFinal(encrypted)
   }
 }
 

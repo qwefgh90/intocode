@@ -28,6 +28,10 @@ import java.io.File
 import java.util.Arrays
 import com.typesafe.config.ConfigFactory
 
+import scala.concurrent.duration._
+import scala.concurrent._
+import java.util.concurrent._
+
 class IntegrationSpec extends FlatSpec with Matchers{
   private val logger = Logger(classOf[IntegrationSpec])
   val systemToken = System.getProperties.getProperty("oauthToken")
@@ -37,10 +41,11 @@ class IntegrationSpec extends FlatSpec with Matchers{
 	Option(systemToken)
   require(systemTokenOpt.isDefined)
 
-  import com.typesafe.config.ConfigFactory
-  import scala.concurrent.duration._
-  import scala.concurrent._
-  import java.util.concurrent._
+  val conf = ConfigFactory.load("victims_client.conf")
+  val mvnPath = Paths.get(conf.getString("maven.path"))
+  val loader = DependencyLoader(mvnPath, ExecutionContext.global)
+  val victim = VictimsLoader(systemTokenOpt)
+  require(Files.exists(mvnPath), s"${mvnPath.toAbsolutePath.toString} does not exists.")
 
   "A dependency loader" should "load tree from remote pom.xml" in {
 	val githubClient = new GitHubClient()
@@ -53,23 +58,26 @@ class IntegrationSpec extends FlatSpec with Matchers{
     val sha = list.find(_.getName=="master").get.getCommit.getSha
     val repo = repoService.getRepository("apache", "spark")
     val rawTree = dataService.getTree(repository, sha, true)
-	val tree = GitTree(rawTree).filter(e => e.entry.getType == TYPE_TREE || e.name == "pom.xml")
+	val tree = TreeEx(rawTree).filterBlob(e => e.entry.getType == TYPE_TREE || e.name == "pom.xml")
     tree.syncContents(repo, dataService)
     val dir = Files.createTempDirectory(s"temp_${System.currentTimeMillis.toString}")
     tree.writeToFileSystem(dir)
     logger.debug(s"spark temp dir: ${dir.toAbsolutePath().toString}")
-    assert(Files.list(dir).count() > 0)
+    tree.foreachEnter((e, list) => { // print pom.xml
+      if(e.name == "pom.xml")
+        logger.debug(list.map(e => e.name).reverse.mkString("/") + "/" + e.name)
+    })
+
+    assert(tree.list.filter(e => e.name == "pom.xml").length >= 37, "Apache Spark has pom files more than 37.")
+
+    val exResult = loader.execute(dir.resolve("pom.xml"))
+    exResult.log.subscribe(s => logger.debug(s))
+    val MavenResult(value, path) = Await.result(exResult.result, Duration(90, TimeUnit.SECONDS))
+    assert(value == MvnResult.Success)
   }
 
-/*  "A victims loader" should "find vulnerables from local pom.xml" in {
-    val conf = ConfigFactory.load("victims_client.conf")
-    val mvnPath = Paths.get(conf.getString("maven.path"))
-    require(Files.exists(mvnPath), s"${mvnPath.toAbsolutePath.toString} does not exists.")
-
-    val loader = DependencyLoader(mvnPath, ExecutionContext.global)
-    val victim = VictimsLoader(systemTokenOpt)
+  "A victims loader" should "find vulnerables from local pom.xml" in {
     val exResult = loader.execute(Paths.get(getClass.getResource("/vulnerable_pom/pom.xml").toURI()))
-    exResult.log.subscribe(str => logger.debug(str))
 
     val MavenResult(value, path) = Await.result(exResult.result, Duration(60, TimeUnit.SECONDS))
 
@@ -83,5 +91,5 @@ class IntegrationSpec extends FlatSpec with Matchers{
     ).toList
     vulLines.foreach(l => logger.debug(s"vulerable artifact: ${l.toString}"))
     assert(vulLines.length >= 2, "It should find artifacts equal to or more than 2")
-  }*/
+  }
 }

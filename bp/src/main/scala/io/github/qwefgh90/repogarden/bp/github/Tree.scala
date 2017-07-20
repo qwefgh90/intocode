@@ -18,6 +18,7 @@ import io.github.qwefgh90.repogarden.bp.github.Implicits._
 
 trait Tree2 {
   private val logger = Logger(classOf[Tree2])
+
   val TYPE_TREE = TreeEntry.TYPE_TREE
   val TYPE_BLOB = TreeEntry.TYPE_BLOB
 
@@ -27,6 +28,11 @@ trait Tree2 {
     def leave(a:A)
   }
 
+  /*
+   * A sub class of org.eclipse.egit.github.core.TreeEntry
+   * Since TreeEntry class does not provide a content of blob,
+   * It provide getContent(), getBytes(), syncContent() method.
+   */
   case class TreeEntryEx(seq: Int, level: Int, name: String, entry: TreeEntry) {
     private var content: String = ""
     private var encoding: String = ""
@@ -68,8 +74,8 @@ trait Tree2 {
     }
   }
 
-  object GitTree {
-    def apply(list: List[TreeEntry]): GitTree = {
+  object TreeEx {
+    def apply(list: List[TreeEntry]): TreeEx = {
       val newList = list.zipWithIndex.map(e => {
         val level = e._1.getPath.count(_ == '/')
         val lastIndex = (e._1.getPath.lastIndexOf("/"))
@@ -78,26 +84,98 @@ trait Tree2 {
           , e._1.getPath.substring(if(lastIndex == -1) 0 else lastIndex+1)
           , e._1)
       })
-      new GitTree(newList)
+      new TreeEx(newList)
     }
 
-    def apply(tree: org.eclipse.egit.github.core.Tree): GitTree = {
+    def apply(tree: org.eclipse.egit.github.core.Tree): TreeEx = {
       apply(tree.getTree.asScala.toList)
     }
   }
 
-  class GitTree private (val list: List[TreeEntryEx]) {
-    def filter(f:TreeEntryEx => Boolean) = {
-      new GitTree(list.filter(f))
+  /*
+   * GitTree is a controller of a list of TreeEntry.
+   * Also, It add some operations like file I/O, functional operations to manipulate tree structure.
+   */
+  class TreeEx private (val list: List[TreeEntryEx]) {
+
+    /*
+     * It removes empty trees.
+     * @return a new instance
+     */
+    def trimEmpty(): TreeEx = {
+      def go(list: List[TreeEntryEx]): List[TreeEntryEx] = {
+        list match {
+          case Nil => Nil
+          case head::tail => {
+            val tailAcc = go(tail)
+            val headOptOfTail = tailAcc.headOption
+            if(head.entry.getType == TYPE_TREE) {
+              if(headOptOfTail.isEmpty){
+                logger.debug(s"${head.entry.getPath} is trimed")
+                tailAcc  //remove head
+              }else{
+                if(head.level + 1 == headOptOfTail.get.level)
+                  head::tailAcc //keeping
+                else{
+                  logger.debug(s"${head.entry.getPath} is trimed")
+                  tailAcc  //remove head
+                }
+              }
+            }else
+               head::tailAcc //keeping
+          }
+        }
+      }
+      new TreeEx(go(list))
     }
+
+    /*
+     * It only applied to blob entry.
+     * @param f filter to be used
+     * @return a new tree
+     */
+    def filterBlob(f:TreeEntryEx => Boolean): TreeEx = {
+      new TreeEx(list.filter(e => { e.entry.getType match {
+        case TYPE_TREE => true
+        case TYPE_BLOB => f(e)
+      }})).trimEmpty()
+    }
+
+    /*
+     * It iterates entries using traverse().
+     * @param a visitor which is a anonymous function
+     * @return Unit
+     */
+    def foreachEnter(f:(TreeEntryEx, List[TreeEntryEx]) => Unit) {
+      traverse(new Visitor[TreeEntryEx, Unit]{
+        override var acc: Unit = Unit
+        override def enter(e: TreeEntryEx, list: List[TreeEntryEx]){
+          f(e,list)
+        }
+        override def leave(e: TreeEntryEx){ }
+      })
+    }
+
+    /*
+     * It shorten a height of tree.
+     * A new tree whose a list contains only path component as prefix is created.
+     * @param pathComponents prefix of tree or blob
+     * @return a new tree
+     */
     def shorten(pathComponents: Array[String]) = {
       val newLevel = pathComponents.length
       val pathString = pathComponents.mkString("/")
       val reducedTree = list.filter(e => e.entry.getPath.startsWith(pathString) && !e.entry.getPath.equals(pathString))
         .zipWithIndex
         .map(tuple => new TreeEntryEx(tuple._2, tuple._1.level - newLevel, tuple._1.name, tuple._1.entry))
-      new GitTree(reducedTree)
+      new TreeEx(reducedTree)
     }
+
+    /*
+     * It uses DFS algorithm.
+     * @param visitor
+     * @return a result to be accumlated
+     */
     def traverse[B](visitor: Visitor[TreeEntryEx,B]): B = {
       val levelIterator = list.toIterator
       @annotation.tailrec
@@ -125,13 +203,18 @@ trait Tree2 {
         }else{
           stack.foreach(v => visitor.leave(v))//leave remainings
         }
-        
       }
       go(1, levelIterator, Nil)
       visitor.acc
     }
 
-    def syncContents(repository: Repository, dataService: DataService) = {
+    /*
+     * It synchronize contents of TreeEntryEx of TreeEx.
+     * @param repository where contents are located
+     * @param dataService where contents are located
+     * @return Unit
+     */
+    def syncContents(repository: Repository, dataService: DataService): Unit = {
       val visitor = new Visitor[TreeEntryEx, Unit]{
         override var acc: Unit = Unit
         override def enter(node: TreeEntryEx, stack: List[TreeEntryEx]) =
@@ -181,108 +264,6 @@ trait Tree2 {
           }
         }
         override def leave(node: TreeEntryEx){}
-      }
-      traverse(visitor)
-    }
-
-  }
-
-}
-
-trait Tree {
-  private val logger = Logger(classOf[Tree])
-
-  trait Visitor[A,B] {
-    var acc: B
-    def enter(a:A, stack:List[A])
-    def leave(a:A)
-  }
-
-  abstract class Node(val get: RepositoryContentsExtend)
-  object NilNode extends Node(new RepositoryContentsExtend)
-  case class TreeNode(override val get: RepositoryContentsExtend, children: List[Node]) extends Node(get)
-  case class TerminalNode(override val get: RepositoryContentsExtend) extends Node(get)
-
-  /**
-    * A repesentation of a tree which contains only blob, tree.
-    */
-  case class Tree(children: List[Node]) {
-    def traverse[B](visitor: Visitor[Node, B]): B = {
-      def go(node: Node, stack: List[Node]): Unit = node match {
-        case terminalNode: TerminalNode => {
-          visitor.enter(terminalNode, stack)
-          visitor.leave(terminalNode)
-        }
-        case treeNode: TreeNode => {
-          visitor.enter(treeNode, stack)
-          treeNode.children.foreach(child => {
-            go(child, treeNode::stack)
-          })
-          visitor.leave(treeNode)
-        }
-      }
-      children.foreach(child => {
-        go(child, Nil)
-      })
-      visitor.acc
-    }
-
-    def syncContents(repository: Repository, dataService: DataService) = {
-      val visitor = new Visitor[Node, Unit]{
-        override var acc: Unit = Unit
-        override def enter(node: Node, stack: List[Node]) =
-          node match {
-            case node: TerminalNode =>
-              node.get.syncContent(repository, dataService)
-            case _ =>
-          }
-        override def leave(node: Node){
-        }
-      }
-      traverse(visitor)
-    }
-
-    def writeToFileSystem(dir: Path, filter: PartialFunction[Node, Boolean] = {case _ => true}): Path = {
-      val visitor = new Visitor[Node, Path]{
-        override var acc: Path = dir
-        override def enter(node: Node, stack: List[Node]){
-          val parentPath = dir.resolve(stack.reverse.map(node => node.get.getName).mkString(java.io.File.separator))
-          val safeFilter: PartialFunction[Node, Boolean] = {
-            case node: TreeNode => if(!filter.isDefinedAt(node)) true else filter(node)
-            case node: TerminalNode => if(!filter.isDefinedAt(node)) true else filter(node)
-            case _ => true
-          }
-
-          node match {
-            case node: TreeNode => {
-              if(safeFilter(node)){
-                val directory = parentPath.resolve(node.get.getName)
-                if(!Files.exists(directory)){
-                  Files.createDirectories(directory)
-                }
-              }else
-                 logger.debug(s"in ${node.get.getPath}, ${node.get.getType}, ${node.get.getName} is filtered.")
-            }
-            case node: TerminalNode => {
-              if(safeFilter(node)){
-                if(Files.exists(parentPath)){
-                  val exNode = node.get
-                  val file = parentPath.resolve(node.get.getName)
-                  if(!Files.exists(file)){
-                    val out = new BufferedOutputStream(Files.newOutputStream(file, CREATE, APPEND))
-                    try{
-                      out.write(exNode.getBytes, 0, exNode.getBytes.length);
-                    } finally{
-                      out.close()
-                    }
-                  }
-                }
-              }else
-                 logger.debug(s"in ${node.get.getPath}, ${node.get.getType}, ${node.get.getName} is filtered.")
-            }
-          }
-        }
-        override def leave(node: Node){}
       }
       traverse(visitor)
     }
