@@ -36,4 +36,11 @@ class GithubService (accessToken: String) {
   def repository(owner: String, name: String) = {
     repoService.getRepository(owner, name)
   }
+
+  def defaultBranch(repository: Repository) = {
+
+    //repository.getM
+    //    repository
+  }
+
 }
