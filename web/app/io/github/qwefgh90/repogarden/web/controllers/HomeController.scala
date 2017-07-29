@@ -1,14 +1,17 @@
 package io.github.qwefgh90.repogarden.web.controllers
 
+import play.api.cache._
 import javax.inject._
 import play.api._
 import play.api.mvc._
 import io.github.qwefgh90.repogarden.web.controllers._
 import scala.concurrent.ExecutionContext
 import scala.concurrent._
+import scala.concurrent.duration._
 import play.api.libs.json._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
 import io.github.qwefgh90.repogarden.web.model.UserInformation
+import io.github.qwefgh90.repogarden.web.service._
 
 /**
  * This controller creates an `Action` to handle HTTP requests to the
@@ -31,4 +34,11 @@ class HomeController @Inject()(ec: ExecutionContext, builder: ActionBuilder) ext
   def userInfo = (builder andThen builder.UserAction(ec)) { implicit request =>
     Ok(Json.toJson(request.user))
   }
+/*
+  def getRepositories = (builder andThen builder.UserAction(ec)) { implicit request =>
+    val tokenFuture = cache.get[String](request.user.getEmail)
+    val token = Await.result(tokenFuture, Duration(10, SECONDS)).get
+    val githubService = new GithubService(token)
+    Ok
+  }*/
 }

@@ -1,6 +1,7 @@
 package io.github.qwefgh90.repogarden.web.controllers
 
 import javax.inject._
+import play.api.cache._
 import play.api._
 import play.api.mvc._
 import play.api.libs.json._
@@ -14,7 +15,7 @@ import io.github.qwefgh90.repogarden.web.service.AuthService
 import io.github.qwefgh90.repogarden.web.service.GithubService
 
 @Singleton
-class AuthController @Inject()(authService: AuthService, implicit val context: ExecutionContext) extends Controller {
+class AuthController @Inject()(authService: AuthService, implicit val context: ExecutionContext, cache: AsyncCacheApi) extends Controller {
   def client = Action { implicit request => 
     val client_id = authService.getClientId
     val state = authService.getState
@@ -32,11 +33,11 @@ class AuthController @Inject()(authService: AuthService, implicit val context: E
         tokenFuture.map(token => {
           val githubService = new GithubService(token)
           val user = githubService.getUser
-          Ok("").withNewSession.withSession("signed" -> "signed","user" -> Json.toJson(user).toString)
-        }
+          //cache.set(user.getEmail, token)
+          Ok("").withSession("signed" -> "signed","user" -> Json.toJson(user).toString)        }
         ).recover{
           case e: RuntimeException => {
-            Logger.warn(s"${request.toString()} ${e}")
+            Logger.warn(s"accessToken ${request.toString()} ${e}")
             BadRequest("invalid request to token.")
           }
         }
@@ -50,7 +51,7 @@ class AuthController @Inject()(authService: AuthService, implicit val context: E
   }
 
   def logout = Action { implicit request => 
-    Ok("").withSession("signed" -> "nosigned")
+    Ok("").withNewSession
   }
 
 }

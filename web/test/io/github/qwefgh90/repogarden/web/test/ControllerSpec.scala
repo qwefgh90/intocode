@@ -1,5 +1,6 @@
 package io.github.qwefgh90.repogarden.web.test
 
+import play.api.cache._
 import org.scalatestplus.play._
 import org.scalatestplus.play.guice._
 import org.scalatest._
@@ -24,6 +25,7 @@ import play.Logger
 
 class ControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
   
+ // val cache = app.injector.instanceOf[AsyncCacheApi]
   val homeController = app.injector.instanceOf[HomeController]
   val encryption = app.injector.instanceOf[Encryption]
   val authService = app.injector.instanceOf[AuthService]
@@ -62,7 +64,7 @@ class ControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
       } { implicit port => 
         WsTestClient.withClient { mockClient =>
           val mockAuthService = new AuthService(configuration, encryption, mockClient, context, "")
-          val authController = new AuthController(mockAuthService, context)
+          val authController = new AuthController(mockAuthService, context, null)
           val fr = FakeRequest().withJsonBody(Json.parse("""{"code":"code", "state":"state", "clientId":"clientId"}"""))
           val result = authController.accessToken.apply(fr)
           status(result) mustBe OK

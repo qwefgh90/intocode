@@ -3,7 +3,7 @@ import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import org.eclipse.egit.github.core._
 
-object Implicits {
+object Implicits extends RepositoryExtension {
   implicit val userReads = new Reads[User]{
     def reads(json: JsValue) = {
       val user = new User()
@@ -40,11 +40,13 @@ object Implicits {
 
   implicit val repositoryWritesToBrowser = new Writes[org.eclipse.egit.github.core.Repository] {
     def writes(repo: org.eclipse.egit.github.core.Repository) = Json.obj(
+      "owner" -> repo.getOwner.getName,
       "name" -> repo.getName,
       "accessLink" -> repo.getUrl,
-      "activated" -> !repo.isPrivate(),
-      "cves" -> List("")
+      "activated" -> true
     )
+
+//eadonly owner, readonly name, readonly accessLink, readonly activated, readonly branches: Array<Branch>, readonly cves: Array<Cve>
   }
 
   implicit val cveWritesToBrowser = new Writes[Cve] {
