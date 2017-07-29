@@ -9,6 +9,7 @@ object Implicits extends RepositoryExtension {
       val user = new User()
       user.setLogin((json \ "id").as[String])
       user.setName((json \ "username").as[String])
+      user.setEmail((json \ "email").as[String])
       user.setAvatarUrl((json \ "imgUrl").as[String])
       new JsSuccess(user)
     }
@@ -21,9 +22,15 @@ object Implicits extends RepositoryExtension {
     )
   }
   
-  implicit val userInformationWrites = new Writes[UserInformation] {
-    def writes(user: UserInformation) = Json.obj(
-     "userId" -> user.userId   
+  val userWritesToSession = new Writes[org.eclipse.egit.github.core.User] {
+    def writes(user: org.eclipse.egit.github.core.User) = Json.obj(
+      "id" -> user.getLogin,
+      "email" -> user.getEmail,
+      "username" -> user.getName,
+      "firstName" -> "",
+      "lastName" -> "",
+      "expiredDate" -> "",
+      "imgUrl" -> user.getAvatarUrl
     )
   }
 
@@ -38,6 +45,26 @@ object Implicits extends RepositoryExtension {
     )
   }
 
+  implicit val branchToBrowser = new Writes[org.eclipse.egit.github.core.RepositoryBranch] {
+    def writes(branch: org.eclipse.egit.github.core.RepositoryBranch) = Json.obj(
+      "name" -> branch.getName
+    )
+  }
+
+  implicit val commitWritesToBrowser = new Writes[org.eclipse.egit.github.core.RepositoryCommit] {
+    def writes(repoCommit: org.eclipse.egit.github.core.RepositoryCommit) = {
+      val commit = repoCommit.getCommit
+      Json.obj(
+        "sha" -> commit.getSha,
+        "message" -> commit.getMessage,
+        "date" -> commit.getCommitter.getDate,
+        "committerEmail" -> commit.getCommitter.getEmail,
+        "committerName" -> commit.getCommitter.getName,
+        "url" -> commit.getUrl
+      )
+    }
+  }
+
   implicit val repositoryWritesToBrowser = new Writes[org.eclipse.egit.github.core.Repository] {
     def writes(repo: org.eclipse.egit.github.core.Repository) = Json.obj(
       "owner" -> repo.getOwner.getName,
@@ -45,8 +72,6 @@ object Implicits extends RepositoryExtension {
       "accessLink" -> repo.getUrl,
       "activated" -> true
     )
-
-//eadonly owner, readonly name, readonly accessLink, readonly activated, readonly branches: Array<Branch>, readonly cves: Array<Cve>
   }
 
   implicit val cveWritesToBrowser = new Writes[Cve] {

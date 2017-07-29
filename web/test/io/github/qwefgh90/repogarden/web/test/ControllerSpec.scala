@@ -1,5 +1,5 @@
 package io.github.qwefgh90.repogarden.web.test
-
+import play.api.inject.ApplicationLifecycle
 import play.api.cache._
 import org.scalatestplus.play._
 import org.scalatestplus.play.guice._
@@ -22,15 +22,33 @@ import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.routing.sird.UrlContext
 import io.github.qwefgh90.repogarden.web.controllers._
 import play.Logger
+import net.sf.ehcache.CacheManager;
+import scala.concurrent.ExecutionContext.Implicits.global
+import akka.util._
+import org.eclipse.egit.github.core._
+import io.github.qwefgh90.repogarden.web.model.Implicits._
 
-class ControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
-  
- // val cache = app.injector.instanceOf[AsyncCacheApi]
+class ControllerSpec extends PlaySpec {
+
+  val app = new GuiceApplicationBuilder()
+	.in(Mode.Test)
+    .build()
+
   val homeController = app.injector.instanceOf[HomeController]
   val encryption = app.injector.instanceOf[Encryption]
   val authService = app.injector.instanceOf[AuthService]
   val configuration = app.injector.instanceOf[Configuration]
   val context = app.injector.instanceOf[ExecutionContext]
+  val cache = app.injector.instanceOf[AsyncCacheApi]
+  val lifeCycle = app.injector.instanceOf[ApplicationLifecycle]
+
+  //it's hack for solving a global cache manager issue
+  //After test, app must shutdown a instance of CacheManager
+  lifeCycle.addStopHook(() => {
+    Future{
+      CacheManager.getInstance().shutdown();
+    }
+  })
 
   "Controller" should {
     val oauthToken = System.getProperties.getProperty("oauthToken")
@@ -41,19 +59,23 @@ class ControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
 	
 	require(oauthTokenOpt.isDefined)
 
-
     "return unauthorized code to a unauthenticated user" in {
       val userInfoResponse = homeController.userInfo.apply(FakeRequest())
       status(userInfoResponse) mustBe UNAUTHORIZED
       session(userInfoResponse).isEmpty mustBe true
-          
+      
       val userInfoResponse2 = homeController.userInfo.apply(FakeRequest().withSession("signed" -> "no signed"))
       status(userInfoResponse2) mustBe UNAUTHORIZED
     }
     
     "return ok to a authenticated user" in {
-       val userInfo = homeController.userInfo.apply(FakeRequest().withSession("signed" -> "signed"))
-       status(userInfo) mustBe OK
+      val user = new User()
+      user.setLogin("login")
+      user.setEmail("email")
+      user.setName("name")
+      user.setAvatarUrl("avatar")
+      val userInfo = homeController.userInfo.apply(FakeRequest().withSession("signed" -> "signed", "user" -> Json.toJson(user)(userWritesToSession).toString))
+      status(userInfo) mustBe OK
     }
     
     "return session data to a authenticated user" in {
@@ -61,15 +83,24 @@ class ControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
         case play.api.routing.sird.POST(p"/login/oauth/access_token") => Action {
           Results.Ok(Json.obj("access_token" -> oauthToken, "token_type" -> "type"))
         }
-      } { implicit port => 
+      } { implicit port =>
         WsTestClient.withClient { mockClient =>
           val mockAuthService = new AuthService(configuration, encryption, mockClient, context, "")
-          val authController = new AuthController(mockAuthService, context, null)
+          val authController = new AuthController(mockAuthService, context, cache)
+
           val fr = FakeRequest().withJsonBody(Json.parse("""{"code":"code", "state":"state", "clientId":"clientId"}"""))
           val result = authController.accessToken.apply(fr)
+
           status(result) mustBe OK
           session(result).data("signed") mustBe "signed"
-          Logger.debug(session(result).data("user").toString)
+          val user = session(result).data("user")
+          val result2 = homeController.getRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
+          //status(result2)(60 seconds) mustBe OK
+          //val json2 = contentAsJson(result2)
+          val result3 = homeController.getOnlyRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
+          status(result3)(3 seconds) mustBe OK
+          val json3 = contentAsJson(result3)
+          Logger.debug(json3.toString)
         }
       }
     }

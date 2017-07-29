@@ -18,7 +18,7 @@ import io.github.qwefgh90.repogarden.web.service._
  * application's home page.
  */
 @Singleton
-class HomeController @Inject()(ec: ExecutionContext, builder: ActionBuilder) extends Controller {
+class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBuilder, cache: AsyncCacheApi) extends Controller {
 
   /**
    * Create an Action to render an HTML page.
@@ -30,15 +30,45 @@ class HomeController @Inject()(ec: ExecutionContext, builder: ActionBuilder) ext
   def index = Action { implicit request =>
     Ok(io.github.qwefgh90.repogarden.web.views.html.index()).withNewSession
   }
-  
-  def userInfo = (builder andThen builder.UserAction(ec)) { implicit request =>
+
+  def userInfo = (builder andThen builder.UserAction) { implicit request =>
     Ok(Json.toJson(request.user))
   }
-/*
-  def getRepositories = (builder andThen builder.UserAction(ec)) { implicit request =>
+
+  def getOnlyRepositories = (builder andThen builder.UserAction).async { implicit request =>
     val tokenFuture = cache.get[String](request.user.getEmail)
-    val token = Await.result(tokenFuture, Duration(10, SECONDS)).get
-    val githubService = new GithubService(token)
-    Ok
-  }*/
+    tokenFuture.map({ tokenOpt =>
+      if(tokenOpt.isDefined){
+        val githubService = new GithubService(tokenOpt.get)
+        Ok(Json.toJson(githubService.getAllRepositories))
+      }else{
+        Logger.warn(s"${request.user.getEmail} unauthorized")
+        Unauthorized
+      }
+    }).recover({
+      case e: Exception => {
+        Logger.warn(e.toString)
+        BadRequest
+      }
+    })
+  }
+
+
+  def getRepositories = (builder andThen builder.UserAction).async { implicit request =>
+    val tokenFuture = cache.get[String](request.user.getEmail)
+    tokenFuture.map({ tokenOpt =>
+      if(tokenOpt.isDefined){
+        val githubService = new GithubService(tokenOpt.get)
+        Ok(githubService.getAllRepositoriesJson)
+      }else{
+        Logger.warn(s"${request.user.getEmail} unauthorized")
+        Unauthorized
+      }
+    }).recover({
+      case e: Exception => {
+        Logger.warn(e.toString)
+        BadRequest
+      }
+    })
+  }
 }

@@ -25,7 +25,6 @@ class AuthController @Inject()(authService: AuthService, implicit val context: E
   def accessToken = Action.async { implicit request =>
     val body: AnyContent = request.body
     body.asJson.map{json => {
-        //code: String, state: String, clientId: String
         val code = json \ "code"
         val state = json \ "state"
         val clientId = json \ "clientId"
@@ -33,12 +32,12 @@ class AuthController @Inject()(authService: AuthService, implicit val context: E
         tokenFuture.map(token => {
           val githubService = new GithubService(token)
           val user = githubService.getUser
-          //cache.set(user.getEmail, token)
-          Ok("").withSession("signed" -> "signed","user" -> Json.toJson(user).toString)        }
+          cache.set(user.getEmail, token)
+          Ok("").withSession("signed" -> "signed","user" -> Json.toJson(user)(userWritesToSession).toString())}
         ).recover{
           case e: RuntimeException => {
-            Logger.warn(s"accessToken ${request.toString()} ${e}")
-            BadRequest("invalid request to token.")
+            Logger.warn(s"accessToken ${request.toString()} ${e} cache: ${cache}")
+            InternalServerError("invalid request to token.")
           }
         }
       }
