@@ -25,12 +25,21 @@ import play.Logger
 class ControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
   
   val homeController = app.injector.instanceOf[HomeController]
-	val encryption = app.injector.instanceOf[Encryption]
-	val authService = app.injector.instanceOf[AuthService]
-	val configuration = app.injector.instanceOf[Configuration]
-	val context = app.injector.instanceOf[ExecutionContext]
-  
+  val encryption = app.injector.instanceOf[Encryption]
+  val authService = app.injector.instanceOf[AuthService]
+  val configuration = app.injector.instanceOf[Configuration]
+  val context = app.injector.instanceOf[ExecutionContext]
+
   "Controller" should {
+    val oauthToken = System.getProperties.getProperty("oauthToken")
+	val oauthTokenOpt = if(oauthToken == null)
+	  Option.empty
+	else
+	  Option(oauthToken)
+	
+	require(oauthTokenOpt.isDefined)
+
+
     "return unauthorized code to a unauthenticated user" in {
       val userInfoResponse = homeController.userInfo.apply(FakeRequest())
       status(userInfoResponse) mustBe UNAUTHORIZED
@@ -48,16 +57,17 @@ class ControllerSpec extends PlaySpec with GuiceOneAppPerSuite  {
     "return session data to a authenticated user" in {
       Server.withRouter() {
         case play.api.routing.sird.POST(p"/login/oauth/access_token") => Action {
-          Results.Ok(Json.obj("access_token" -> "fake token","token_type" -> "type"))
+          Results.Ok(Json.obj("access_token" -> oauthToken, "token_type" -> "type"))
         }
       } { implicit port => 
-        WsTestClient.withClient { clientToMock =>
-          val authService = new AuthService(configuration, encryption, clientToMock, context, "")
-          val authController = new AuthController(authService)
+        WsTestClient.withClient { mockClient =>
+          val mockAuthService = new AuthService(configuration, encryption, mockClient, context, "")
+          val authController = new AuthController(mockAuthService, context)
           val fr = FakeRequest().withJsonBody(Json.parse("""{"code":"code", "state":"state", "clientId":"clientId"}"""))
           val result = authController.accessToken.apply(fr)
           status(result) mustBe OK
           session(result).data("signed") mustBe "signed"
+          Logger.debug(session(result).data("user").toString)
         }
       }
     }

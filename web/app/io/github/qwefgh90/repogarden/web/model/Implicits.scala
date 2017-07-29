@@ -1,7 +1,19 @@
 package io.github.qwefgh90.repogarden.web.model
 import play.api.libs.json._
+import play.api.libs.functional.syntax._
+import org.eclipse.egit.github.core._
 
 object Implicits {
+  implicit val userReads = new Reads[User]{
+    def reads(json: JsValue) = {
+      val user = new User()
+      user.setLogin((json \ "id").as[String])
+      user.setName((json \ "username").as[String])
+      user.setAvatarUrl((json \ "imgUrl").as[String])
+      new JsSuccess(user)
+    }
+  }
+
   implicit val initialVectorWrites = new Writes[InitialVector] {
     def writes(vec: InitialVector) = Json.obj(
       "client_id" -> vec.client_id,

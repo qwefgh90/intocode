@@ -5,32 +5,52 @@ import play.api._
 import play.api.mvc._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 import io.github.qwefgh90.repogarden.web.model._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
 import io.github.qwefgh90.repogarden.web.service.AuthService
+import io.github.qwefgh90.repogarden.web.service.GithubService
 
 @Singleton
-class AuthController @Inject()(authService: AuthService) extends Controller {
-  
+class AuthController @Inject()(authService: AuthService, implicit val context: ExecutionContext) extends Controller {
   def client = Action { implicit request => 
-    val client_id = "github client id"
-    val state = "unsuggestable random string"
+    val client_id = authService.getClientId
+    val state = authService.getState
     Ok(Json.toJson(new InitialVector(client_id, state)))
   }
   
-  def accessToken = Action { implicit request =>
+  def accessToken = Action.async { implicit request =>
     val body: AnyContent = request.body
     body.asJson.map{json => {
         //code: String, state: String, clientId: String
         val code = json \ "code"
         val state = json \ "state"
         val clientId = json \ "clientId"
-        authService.getAccessToken(code.as[String], state.as[String], clientId.as[String])
-        Ok("").withNewSession.withSession("signed" -> "signed")
+        val tokenFuture = authService.getAccessToken(code.as[String], state.as[String], clientId.as[String])
+        tokenFuture.map(token => {
+          val githubService = new GithubService(token)
+          val user = githubService.getUser
+          Ok("").withNewSession.withSession("signed" -> "signed","user" -> Json.toJson(user).toString)
+        }
+        ).recover{
+          case e: RuntimeException => {
+            Logger.warn(s"${request.toString()} ${e}")
+            BadRequest("invalid request to token.")
+          }
+        }
       }
     }.getOrElse{
-      BadRequest("Expecting application/json request body")
+      Future{ 
+        Logger.warn(s"${request.toString()}")
+        BadRequest("Expecting application/json request body") 
+      }
     }
   }
+
+  def logout = Action { implicit request => 
+    Ok("").withSession("signed" -> "nosigned")
+  }
+
 }

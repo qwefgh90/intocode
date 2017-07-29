@@ -2,6 +2,8 @@ package io.github.qwefgh90.repogarden.web.service
 
 import org.eclipse.egit.github.core.service._
 import play.api.Configuration
+import play.api.http._
+import java.util.Base64
 import javax.inject._
 import javax.crypto.spec.SecretKeySpec
 import javax.crypto.spec.IvParameterSpec
@@ -29,16 +31,25 @@ class AuthService (configuration: Configuration, encryption: Encryption, ws: WSC
   require(accessTokenPath.nonEmpty)
   private val clientSecret = configuration.getString("play.clientSecret")
   require(clientSecret.nonEmpty)
-  
+
+  private val encoder = Base64.getUrlEncoder
+  private val decoder = Base64.getUrlDecoder
+
   case class AccessToken(token: String, tokenType: String)
   implicit val accessTokenRead: Reads[AccessToken] = (
     (JsPath \ "access_token").read[String] and
     (JsPath \ "token_type").read[String]
   )(AccessToken.apply _)
 
-  def getState: Array[Byte] = {
+  /*
+   * WARNING
+   * it must be unsuggestable random string.
+   */
+  @deprecated("It is not able to make safe keys which can be suggestable", "AuthService.scala")
+  def getState: String = {
     val plainText = System.currentTimeMillis.toString.getBytes 
-    encryption.encrypt(plainText)
+    val encrypted = encryption.encrypt(plainText)
+    encoder.encodeToString(encrypted)
   }
   
   def getClientId: String = clientId.get
@@ -52,8 +63,11 @@ class AuthService (configuration: Configuration, encryption: Encryption, ws: WSC
         , "state" -> Seq(state)))
          
     val tokenFuture = response.map(response => {
-      response.json.as[AccessToken]}
-    )(context)
+      if(response.status == Status.OK)
+        response.json.as[AccessToken]
+      else
+        throw new RuntimeException(response.body)
+    })(context)
     
     return tokenFuture.map(_.token)(context)
   }

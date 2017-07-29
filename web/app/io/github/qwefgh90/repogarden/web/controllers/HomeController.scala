@@ -29,6 +29,6 @@ class HomeController @Inject()(ec: ExecutionContext, builder: ActionBuilder) ext
   }
   
   def userInfo = (builder andThen builder.UserAction(ec)) { implicit request =>
-    Ok(Json.toJson(new UserInformation("userid")))
+    Ok(Json.toJson(request.user))
   }
 }
