@@ -56,6 +56,13 @@ object Boilerplate {
     }
   }
 
+  def timer(block: => Unit)(handler: (Long, Long) => Unit){
+    val before = System.currentTimeMillis
+    block
+    val after = System.currentTimeMillis
+    handler(before, after)
+  }
+
   /**
    * Read all bytes from stream and don't close it.
    * 

@@ -27,6 +27,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import akka.util._
 import org.eclipse.egit.github.core._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
+import io.github.qwefgh90.repogarden.bp.Boilerplate._
 
 class ControllerSpec extends PlaySpec {
 
@@ -94,11 +95,16 @@ class ControllerSpec extends PlaySpec {
           status(result) mustBe OK
           session(result).data("signed") mustBe "signed"
           val user = session(result).data("user")
+          
           val result2 = homeController.getRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
           //status(result2)(60 seconds) mustBe OK
           //val json2 = contentAsJson(result2)
           val result3 = homeController.getOnlyRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
-          status(result3)(3 seconds) mustBe OK
+          timer{
+            status(result3)(3 seconds) mustBe OK
+          }((before, after) => {
+            Logger.debug(s"getOnlyRepositories() takes ${after-before} millis")
+          })
           val json3 = contentAsJson(result3)
           Logger.debug(json3.toString)
         }
