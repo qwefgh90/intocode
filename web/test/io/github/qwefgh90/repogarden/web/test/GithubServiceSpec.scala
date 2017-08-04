@@ -18,6 +18,7 @@ class GithubServiceSpec extends FlatSpec with Matchers {
 	
   "GithubService" should "get user information using access token" in {
     val githubService = new GithubService(oauthTokenOpt.get)
+    Logger.debug(githubService.getUser.getId.toString)
     Logger.debug(githubService.getUser.getLogin)
     Logger.debug(githubService.getUser.getAvatarUrl)
     Logger.debug(githubService.getUser.getHtmlUrl)
