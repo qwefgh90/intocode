@@ -18,7 +18,7 @@ import io.github.qwefgh90.repogarden.web.service._
  * application's home page.
  */
 @Singleton
-class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBuilder, cache: AsyncCacheApi) extends Controller {
+class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider) extends Controller {
 
   /**
    * Create an Action to render an HTML page.
@@ -39,7 +39,7 @@ class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBui
     val tokenFuture = cache.get[String](request.user.getEmail)
     tokenFuture.map({ tokenOpt =>
       if(tokenOpt.isDefined){
-        val githubService = new GithubService(tokenOpt.get)
+        val githubService = githubProvider.getInstance(tokenOpt.get)
         Ok(Json.toJson(githubService.getAllRepositories))
       }else{
         Logger.warn(s"${request.user.getEmail} unauthorized")
@@ -53,12 +53,11 @@ class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBui
     })
   }
 
-
   def getRepositories = (builder andThen builder.UserAction).async { implicit request =>
     val tokenFuture = cache.get[String](request.user.getEmail)
     tokenFuture.map({ tokenOpt =>
       if(tokenOpt.isDefined){
-        val githubService = new GithubService(tokenOpt.get)
+        val githubService = githubProvider.getInstance(tokenOpt.get)
         Ok(githubService.getAllRepositoriesJson)
       }else{
         Logger.warn(s"${request.user.getEmail} unauthorized")

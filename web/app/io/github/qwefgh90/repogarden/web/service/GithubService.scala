@@ -1,5 +1,7 @@
 package io.github.qwefgh90.repogarden.web.service
 
+import play.api.cache._
+import javax.inject._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
@@ -10,9 +12,19 @@ import org.eclipse.egit.github.core.client.GitHubClient
 import scala.collection.JavaConverters._
 import io.github.qwefgh90.repogarden.web.model._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
+import scala.concurrent.duration._
+import java.util.concurrent._
 
+@Singleton
+class GithubServiceProvider @Inject() (@NamedCache("github-api-cache") cache: AsyncCacheApi) {
+  def getInstance(accessToken: String): GithubService = {
+    cache.sync.getOrElseUpdate(accessToken, Duration(60, TimeUnit.SECONDS)){
+      new GithubService(accessToken, Some(cache.sync))
+    }
+  }
+}
 
-class GithubService (accessToken: String) {
+class GithubService (accessToken: String, cacheOpt: Option[SyncCacheApi] = Option.empty) {
   private lazy val client = {
     val client = new GitHubClient()
     client.setOAuth2Token(accessToken)
@@ -29,36 +41,58 @@ class GithubService (accessToken: String) {
   private lazy val commitService = {
 	new CommitService(client);
   }
-  private lazy val user = {
-    userService.getUser
-  }
-
-  def getAllRepositories: List[Repository] = {
-    repoService.getRepositories.asScala.toList
-  }
 
   def getUser = {
-    user
+    userService.getUser
   }
   
-  def repository(owner: String, name: String): Repository = {
-    repoService.getRepository(owner, name)
+  object KeyType extends Enumeration{
+    type KeyType = Value
+    val getAllRepositories, getBranches, getCommits, getCommit, getRepository = Value
+    def getKey(key: String, t: KeyType, params: List[String] = List()) =
+      s"${key}:${t.toString}:${params.mkString(":")}"
   }
 
-  def getBranches(repository: Repository) = {
-    repoService.getBranches(repository).asScala
+  def cached[A: scala.reflect.ClassTag](key: String, block: => A)(implicit invalidate: Boolean = false): A = {
+    cacheOpt match {
+      case Some(cache) if invalidate == false => cache.getOrElseUpdate(key, Duration(60, TimeUnit.SECONDS))(block)
+      case Some(cache) if invalidate == true => block
+      case None => block
+    }
   }
 
-  def getCommits(repository: Repository) = {
-    commitService.getCommits(repository)
+  def getAllRepositories(implicit invalidate: Boolean = false): List[Repository] = {
+    cached(KeyType.getKey(accessToken, KeyType.getAllRepositories) ,{
+      repoService.getRepositories.asScala.toList
+    })
   }
 
-  def getCommit(repository: Repository, sha: String): Option[RepositoryCommit] = {
-    val commit = commitService.getCommit(repository, sha)
-    if(commit.getCommit == null)
-      Option.empty
-    else
-      Option(commit)
+  def getRepository(owner: String, name: String)(implicit invalidate: Boolean = false): Repository = {
+    cached(KeyType.getKey(accessToken, KeyType.getRepository, List(owner, name)) ,{
+      repoService.getRepository(owner, name)
+    })
+  }
+
+  def getBranches(repository: Repository)(implicit invalidate: Boolean = false) = {
+    cached(KeyType.getKey("", KeyType.getBranches, List(repository.getOwner.getName, repository.getName)) ,{
+      repoService.getBranches(repository).asScala
+    })
+  }
+
+  def getCommits(repository: Repository)(implicit invalidate: Boolean = false) = {
+    cached(KeyType.getKey("", KeyType.getCommits, List(repository.getOwner.getName, repository.getName)) ,{
+      commitService.getCommits(repository)
+    })
+  }
+
+  def getCommit(repository: Repository, sha: String)(implicit invalidate: Boolean = false): Option[RepositoryCommit] = {
+    cached(KeyType.getKey("", KeyType.getCommit, List(repository.getOwner.getName, repository.getName, sha)) ,{
+      val commit = commitService.getCommit(repository, sha)
+      if(commit.getCommit == null)
+        Option.empty
+      else
+        Option(commit)
+    })
   }
 
   def getAllRepositoriesJson() = {

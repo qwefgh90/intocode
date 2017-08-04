@@ -41,6 +41,7 @@ class ControllerSpec extends PlaySpec {
   val configuration = app.injector.instanceOf[Configuration]
   val context = app.injector.instanceOf[ExecutionContext]
   val cache = app.injector.instanceOf[AsyncCacheApi]
+  val githubProvider = app.injector.instanceOf[GithubServiceProvider]
   val lifeCycle = app.injector.instanceOf[ApplicationLifecycle]
 
   //it's hack for solving a global cache manager issue
@@ -87,7 +88,7 @@ class ControllerSpec extends PlaySpec {
       } { implicit port =>
         WsTestClient.withClient { mockClient =>
           val mockAuthService = new AuthService(configuration, encryption, mockClient, context, "")
-          val authController = new AuthController(mockAuthService, context, cache)
+          val authController = new AuthController(mockAuthService, context, cache, githubProvider)
 
           val fr = FakeRequest().withJsonBody(Json.parse("""{"code":"code", "state":"state", "clientId":"clientId"}"""))
           val result = authController.accessToken.apply(fr)
@@ -96,7 +97,7 @@ class ControllerSpec extends PlaySpec {
           session(result).data("signed") mustBe "signed"
           val user = session(result).data("user")
           
-          val result2 = homeController.getRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
+          //val result2 = homeController.getRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
           //status(result2)(60 seconds) mustBe OK
           //val json2 = contentAsJson(result2)
           val result3 = homeController.getOnlyRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
@@ -106,7 +107,15 @@ class ControllerSpec extends PlaySpec {
             Logger.debug(s"getOnlyRepositories() takes ${after-before} millis")
           })
           val json3 = contentAsJson(result3)
-          Logger.debug(json3.toString)
+          //Logger.debug(json3.toString)
+
+          val result4 = homeController.getOnlyRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
+          timer{
+            status(result4)(3 seconds) mustBe OK
+          }((before, after) => {
+            assert(after - before <= 10)
+            Logger.debug(s"getOnlyRepositories() takes ${after-before} millis")
+          })
         }
       }
     }

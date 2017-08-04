@@ -13,9 +13,10 @@ import io.github.qwefgh90.repogarden.web.model._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
 import io.github.qwefgh90.repogarden.web.service.AuthService
 import io.github.qwefgh90.repogarden.web.service.GithubService
+import io.github.qwefgh90.repogarden.web.service.GithubServiceProvider
 
 @Singleton
-class AuthController @Inject()(authService: AuthService, implicit val context: ExecutionContext, cache: AsyncCacheApi) extends Controller {
+class AuthController @Inject()(authService: AuthService, implicit val context: ExecutionContext, cache: AsyncCacheApi, githubProvider: GithubServiceProvider) extends Controller {
   def client = Action { implicit request => 
     val client_id = authService.getClientId
     val state = authService.getState
@@ -30,7 +31,7 @@ class AuthController @Inject()(authService: AuthService, implicit val context: E
         val clientId = json \ "clientId"
         val tokenFuture = authService.getAccessToken(code.as[String], state.as[String], clientId.as[String])
         tokenFuture.map(token => {
-          val githubService = new GithubService(token)
+          val githubService = githubProvider.getInstance(token)
           val user = githubService.getUser
           cache.set(user.getEmail, token)
           Ok("").withSession("signed" -> "signed","user" -> Json.toJson(user)(userWritesToSession).toString())}
