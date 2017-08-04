@@ -19,7 +19,9 @@ import play.api.Configuration
 import scala.concurrent._
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.routing.sird.UrlContext
-
+import scala.concurrent.ExecutionContext.Implicits.global
+import net.sf.ehcache.CacheManager
+import play.api.Application
 
 /**
   * Add your spec here.
@@ -28,8 +30,11 @@ import play.api.routing.sird.UrlContext
   * For more information, see https://www.playframework.com/documentation/latest/ScalaTestingWithScalaTest
   */
 class AuthServiceSpec extends PlaySpec with GuiceOneAppPerSuite {
-  override def fakeApplication() = new GuiceApplicationBuilder()
-//	.in(new File("application.conf"))
+  //it's hack for solving a global cache manager issue
+  //Before test, app must shutdown a instance of CacheManager
+  //CacheManager.getInstance().shutdown();
+  
+  override def fakeApplication(): Application = new GuiceApplicationBuilder()
 	.in(Mode.Test)
 	.build()
 
@@ -37,7 +42,7 @@ class AuthServiceSpec extends PlaySpec with GuiceOneAppPerSuite {
   val authService = app.injector.instanceOf[AuthService]
   val configuration = app.injector.instanceOf[Configuration]
   val context = app.injector.instanceOf[ExecutionContext]
-  
+
   "AuthService" should {
 	"return access token" in {
 	  import play.api.routing.sird._
@@ -56,6 +61,7 @@ class AuthServiceSpec extends PlaySpec with GuiceOneAppPerSuite {
   }
   
   "Encryption" should {
+
     "encrypt plain text and then decrypt" in {
       val plainText = "HelloWorld"
       val encrypted = encryption.encrypt(plainText.getBytes)

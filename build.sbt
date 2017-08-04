@@ -43,7 +43,9 @@ lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(bp).d
     libraryDependencies += "com.typesafe.play" %% "play-iteratees-reactive-streams" % "2.6.1",
     libraryDependencies += "com.typesafe.play" %% "play-ahc-ws-standalone" % "1.0.1",
     libraryDependencies += "com.typesafe.play" %% "play-ws-standalone-json" % "1.0.1",
-    libraryDependencies += "com.typesafe.play" %% "play-ws-standalone-xml" % "1.0.1"
+    libraryDependencies += "com.typesafe.play" %% "play-ws-standalone-xml" % "1.0.1",
+    libraryDependencies += "com.typesafe.play" %% "play-slick" % "3.0.0",
+    libraryDependencies += "com.h2database" % "h2" % "1.4.196" % "test"
   )
 
 lazy val victims_client = (project in file("victims-client")).dependsOn(bp).

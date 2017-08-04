@@ -14,17 +14,18 @@ import io.github.qwefgh90.repogarden.web.model._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
 import scala.concurrent.duration._
 import java.util.concurrent._
+import io.github.qwefgh90.repogarden.web.dao._
 
 @Singleton
-class GithubServiceProvider @Inject() (@NamedCache("github-api-cache") cache: AsyncCacheApi) {
+class GithubServiceProvider @Inject() (@NamedCache("github-api-cache") cache: AsyncCacheApi, switchDao: SwitchDao) {
   def getInstance(accessToken: String): GithubService = {
     cache.sync.getOrElseUpdate(accessToken, Duration(60, TimeUnit.SECONDS)){
-      new GithubService(accessToken, Some(cache.sync))
+      new GithubService(accessToken, switchDao, Some(cache.sync))
     }
   }
 }
 
-class GithubService (accessToken: String, cacheOpt: Option[SyncCacheApi] = Option.empty) {
+class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option[SyncCacheApi] = Option.empty) {
   private lazy val client = {
     val client = new GitHubClient()
     client.setOAuth2Token(accessToken)
