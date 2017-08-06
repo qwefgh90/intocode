@@ -27,10 +27,7 @@ class GithubServiceSpec extends FlatSpec with Matchers with GuiceOneAppPerSuite 
 	.in(Mode.Test)
 	.build()
 
-
-
   val provider = app.injector.instanceOf[GithubServiceProvider]
-
   val githubService = provider.getInstance(oauthToken)
 
   "GithubService" should "get user information using access token" in {
@@ -51,7 +48,23 @@ class GithubServiceSpec extends FlatSpec with Matchers with GuiceOneAppPerSuite 
   }
   
   "GithubService" should "get repositories using access token" in {
-    //      val githubService = new GithubService(oauthTokenOpt.get)
-    assert(githubService.getAllRepositories.length > 0)
+    val repositories = githubService.getAllRepositories
+    assert(repositories.length >= 0)
+    if(repositories.length > 0 ){
+      val repo = repositories(0)
+      val branches = githubService.getBranches(repo)
+      if(branches.length > 0){
+        val branch = branches(0)
+        Logger.debug(s"repository:  ${repo.getOwner.getId}, ${repo.getOwner.getUrl}, ${repo.getName}, ${branch.getName}")
+        val commitOpt = githubService.getCommit(repo, branch.getCommit.getSha)
+        commitOpt.map { commit => {
+          Logger.debug(s"commit: ${commit.getCommit.getMessage}, ${commit.getSha}")
+          Logger.debug(s"tree: ${commit.getCommit.getTree.getUrl}")
+          val tree = githubService.getTree(repo, commit.getCommit.getTree.getSha)
+          Logger.debug("\n" + tree.filterBlob(_.name.endsWith(".cpp")).list.map(entry => entry.level + " " + (" " * entry.level) + entry.entry.getPath).mkString("\n"))
+        }
+        }
+      }
+    }
   }
 }

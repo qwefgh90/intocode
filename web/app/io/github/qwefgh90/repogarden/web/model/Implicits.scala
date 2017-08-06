@@ -6,12 +6,23 @@ import org.eclipse.egit.github.core._
 object Implicits extends RepositoryExtension {
   implicit val userReads = new Reads[User]{
     def reads(json: JsValue) = {
-      val user = new User()
-      user.setLogin((json \ "id").as[String])
-      user.setName((json \ "username").as[String])
-      user.setEmail((json \ "email").as[String])
-      user.setAvatarUrl((json \ "imgUrl").as[String])
-      new JsSuccess(user)
+      val idOpt = (json \ "id").asOpt[Int]
+      val usernameOpt = (json \ "username").asOpt[String]
+      val emailOpt = (json \ "email").asOpt[String]
+      val imgUrlOpt = (json \ "imgUrl").asOpt[String]
+      val optSeq = Seq(idOpt, usernameOpt, emailOpt, imgUrlOpt)
+      val validated = optSeq.forall(_.isDefined)
+
+      if(validated){
+        val user = new User()
+        user.setId(idOpt.get)
+        user.setName(usernameOpt.get)
+        user.setEmail(emailOpt.get)
+        user.setAvatarUrl(imgUrlOpt.get)
+        new JsSuccess(user)
+      }else
+        JsError(s"It failed to parse json to User object. ${optSeq.zipWithIndex.filter(_._1.isEmpty).mkString}")
+
     }
   }
 
@@ -24,7 +35,7 @@ object Implicits extends RepositoryExtension {
   
   val userWritesToSession = new Writes[org.eclipse.egit.github.core.User] {
     def writes(user: org.eclipse.egit.github.core.User) = Json.obj(
-      "id" -> user.getLogin,
+      "id" -> user.getId,
       "email" -> user.getEmail,
       "username" -> user.getName,
       "firstName" -> "",
@@ -36,7 +47,7 @@ object Implicits extends RepositoryExtension {
 
   implicit val userWritesToBrowser = new Writes[org.eclipse.egit.github.core.User] {
     def writes(user: org.eclipse.egit.github.core.User) = Json.obj(
-      "id" -> user.getLogin,
+      "id" -> user.getId,
       "username" -> user.getName,
       "firstName" -> "",
       "lastName" -> "",
@@ -82,4 +93,18 @@ object Implicits extends RepositoryExtension {
       "references" -> cve.references
     )
   }
+
+  //SpellCheck
+  implicit val spellCheckResultFormat: Format[SpellCheckResult] = (
+    (JsPath \ "sentence").format[String] and
+      (JsPath \ "positionList").format[List[TypoPosition]]
+  )(SpellCheckResult.apply, unlift(SpellCheckResult.unapply))
+
+  implicit val typoPositionFormat: Format[TypoPosition] = (
+    (JsPath \ "text").format[String] and
+      (JsPath \ "offset").format[Int] and
+      (JsPath \ "length").format[Int] and
+      (JsPath \ "suggestedList").format[List[String]]
+  )(TypoPosition.apply, unlift(TypoPosition.unapply))
+
 }

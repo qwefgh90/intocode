@@ -63,7 +63,7 @@ class SwitchDaoSpec extends PlaySpec with GuiceOneAppPerSuite {
     "edit and compare values " in {
       Await.result(switchDao.updateSwitch(switch1.userId, switch1.repositoryId, !switch1.yn), Duration(10, TimeUnit.SECONDS))
       val returned = Await.result(
-        switchDao.select(switch1.userId, switch1.repositoryId), Duration(10, TimeUnit.SECONDS))
+        switchDao.select(switch1.userId, switch1.repositoryId), Duration(10, TimeUnit.SECONDS)).get
       Logger.debug(s"returned: ${returned.toString}")
       assert(returned.yn == !switch1.yn)
     }

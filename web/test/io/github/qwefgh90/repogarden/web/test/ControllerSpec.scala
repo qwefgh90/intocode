@@ -10,6 +10,7 @@ import play.api.test.Helpers._
 import java.io._
 import play.api.Mode
 import io.github.qwefgh90.repogarden.web.service._
+import io.github.qwefgh90.repogarden.web.dao._
 import java.util.Base64
 import play.api.mvc._
 import play.core.server.Server
@@ -29,8 +30,9 @@ import org.eclipse.egit.github.core._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
 import io.github.qwefgh90.repogarden.bp.Boilerplate._
 import play.api.Application
+import java.util.concurrent._
 
-class ControllerSpec extends PlaySpec {//with GuiceOneAppPerSuite {
+class ControllerSpec extends PlaySpec with BeforeAndAfterAll {//with GuiceOneAppPerSuite {
   //it's hack for solving a global cache manager issue
   //After test, app must shutdown a instance of CacheManager
   /*lifeCycle.addStopHook(() => {
@@ -41,10 +43,20 @@ class ControllerSpec extends PlaySpec {//with GuiceOneAppPerSuite {
 
 //  override def fakeApplication(): Application
 
+  val app = new GuiceApplicationBuilder()
+	.in(Mode.Test)
+	.build()
+
+  override def beforeAll() {
+    println("Before!")  // start up your web server or whatever
+  }
+
+  override def afterAll() {
+    app.stop()
+    println("After!")  // shut down the web server
+  }         
+
   "Controller" should {
-    val app = new GuiceApplicationBuilder()
-	  .in(Mode.Test)
-	  .build()
 
     val homeController = app.injector.instanceOf[HomeController]
     val encryption = app.injector.instanceOf[Encryption]
@@ -53,7 +65,10 @@ class ControllerSpec extends PlaySpec {//with GuiceOneAppPerSuite {
     val context = app.injector.instanceOf[ExecutionContext]
     val cache = app.injector.instanceOf[AsyncCacheApi]
     val githubProvider = app.injector.instanceOf[GithubServiceProvider]
-    val lifeCycle = app.injector.instanceOf[ApplicationLifecycle]
+
+
+    val switchDao = app.injector.instanceOf[SwitchDao]
+    Await.result(switchDao.create(), Duration(10, TimeUnit.SECONDS))
 
     val oauthToken = System.getProperties.getProperty("oauthToken")
 	val oauthTokenOpt = if(oauthToken == null)
@@ -67,22 +82,24 @@ class ControllerSpec extends PlaySpec {//with GuiceOneAppPerSuite {
       val userInfoResponse = homeController.userInfo.apply(FakeRequest())
       status(userInfoResponse) mustBe UNAUTHORIZED
       session(userInfoResponse).isEmpty mustBe true
-      
       val userInfoResponse2 = homeController.userInfo.apply(FakeRequest().withSession("signed" -> "no signed"))
       status(userInfoResponse2) mustBe UNAUTHORIZED
     }
     
-    "return ok to a authenticated user" in {
+    "return ok, if a authenticated user try" in {
       val user = new User()
+      user.setId(1234)
       user.setLogin("login")
       user.setEmail("email")
       user.setName("name")
       user.setAvatarUrl("avatar")
+      cache.sync.set(user.getId.toString, oauthToken)
       val userInfo = homeController.userInfo.apply(FakeRequest().withSession("signed" -> "signed", "user" -> Json.toJson(user)(userWritesToSession).toString))
       status(userInfo) mustBe OK
     }
-    
-    "return session data to a authenticated user" in {
+
+    "return repositories" in {
+
       val result = Server.withRouter() {
         case play.api.routing.sird.POST(p"/login/oauth/access_token") => Action {
           Results.Ok(Json.obj("access_token" -> oauthToken, "token_type" -> "type"))
@@ -98,7 +115,7 @@ class ControllerSpec extends PlaySpec {//with GuiceOneAppPerSuite {
           status(result) mustBe OK
           session(result).data("signed") mustBe "signed"
           val user = session(result).data("user")
-          
+
           val result2 = homeController.getRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
 
           timer{
@@ -109,16 +126,38 @@ class ControllerSpec extends PlaySpec {//with GuiceOneAppPerSuite {
 
           val result3 = homeController.getOnlyRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
           timer{
+            (contentAsJson(result3) \\ "yn").foreach(yn =>{
+              assert(yn.as[Boolean] == false)
+            })
+
             status(result3)(3 seconds) mustBe OK
           }((before, after) => {
             Logger.debug(s"getOnlyRepositories() takes ${after-before} millis")
           })
-
         }
 
       }
-      Thread.sleep(5000)
-      app.stop()
+    }
+
+    "return session data to a authenticated user" in {
+
+      val result = Server.withRouter() {
+        case play.api.routing.sird.POST(p"/login/oauth/access_token") => Action {
+          Results.Ok(Json.obj("access_token" -> oauthToken, "token_type" -> "type"))
+        }
+      } { implicit port =>
+        WsTestClient.withClient { mockClient =>
+          val mockAuthService = new AuthService(configuration, encryption, mockClient, context, "")
+          val authController = new AuthController(mockAuthService, context, cache, githubProvider)
+
+          val fr = FakeRequest().withJsonBody(Json.parse("""{"code":"code", "state":"state", "clientId":"clientId"}"""))
+          val result = authController.accessToken.apply(fr)
+
+          status(result) mustBe OK
+          session(result).data("signed") mustBe "signed"
+        }
+
+      }
       Logger.debug(s"async result is ${result}")
     }
   }

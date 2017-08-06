@@ -12,13 +12,14 @@ import play.api.libs.json._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
 import io.github.qwefgh90.repogarden.web.model.UserInformation
 import io.github.qwefgh90.repogarden.web.service._
+import io.github.qwefgh90.repogarden.web.dao._
 
 /**
  * This controller creates an `Action` to handle HTTP requests to the
  * application's home page.
  */
 @Singleton
-class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider) extends Controller {
+class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider, switchDao: SwitchDao) extends Controller {
 
   /**
    * Create an Action to render an HTML page.
@@ -36,13 +37,22 @@ class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBui
   }
 
   def getOnlyRepositories = (builder andThen builder.UserAction).async { implicit request =>
-    val tokenFuture = cache.get[String](request.user.getEmail)
+    val tokenFuture = cache.get[String](request.user.getId.toString)
     tokenFuture.map({ tokenOpt =>
       if(tokenOpt.isDefined){
         val githubService = githubProvider.getInstance(tokenOpt.get)
-        Ok(Json.toJson(githubService.getAllRepositories))
+        val result = Json.toJson(githubService.getAllRepositories.map(repository => {
+          Json.toJson(repository) match {
+            case obj: JsObject => { 
+              val ynOpt = Await.result(switchDao.select(request.user.getId.toString, repository.getId.toString), 10 seconds).map(_.yn)
+              
+              obj + ("yn" -> JsBoolean(ynOpt.getOrElse(false)))
+            }
+          }
+        }))
+        Ok(result)
       }else{
-        Logger.warn(s"${request.user.getEmail} unauthorized")
+        Logger.warn(s"${request.user.getEmail} / ${request.user.getId} unauthorized")
         Unauthorized
       }
     }).recover({
@@ -53,14 +63,29 @@ class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBui
     })
   }
 
+
+  def getBranches = (builder andThen builder.UserAction).async { implicit request =>
+    val tokenFuture = cache.get[String](request.user.getId.toString)
+    tokenFuture.map({ tokenOpt =>
+      if(tokenOpt.isDefined){
+        val githubService = githubProvider.getInstance(tokenOpt.get)
+        Ok
+      }else{
+        Logger.warn(s"${request.user.getEmail} / ${request.user.getId} unauthorized")
+        Unauthorized
+      }
+    })
+  }
+    
+
   def getRepositories = (builder andThen builder.UserAction).async { implicit request =>
-    val tokenFuture = cache.get[String](request.user.getEmail)
+    val tokenFuture = cache.get[String](request.user.getId.toString)
     tokenFuture.map({ tokenOpt =>
       if(tokenOpt.isDefined){
         val githubService = githubProvider.getInstance(tokenOpt.get)
         Ok(githubService.getAllRepositoriesJson)
       }else{
-        Logger.warn(s"${request.user.getEmail} unauthorized")
+        Logger.warn(s"${request.user.getEmail} / ${request.user.getId} unauthorized")
         Unauthorized
       }
     }).recover({

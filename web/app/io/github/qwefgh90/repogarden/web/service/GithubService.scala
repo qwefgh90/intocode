@@ -42,7 +42,9 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
   private lazy val commitService = {
 	new CommitService(client);
   }
-
+  private lazy val dataService = {
+	new DataService(client);
+  }
   def getUser = {
     userService.getUser
   }
@@ -64,7 +66,11 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
 
   def getAllRepositories(implicit invalidate: Boolean = false): List[Repository] = {
     cached(KeyType.getKey(accessToken, KeyType.getAllRepositories) ,{
-      repoService.getRepositories.asScala.toList
+      val repositoriesJava = repoService.getRepositories
+      if(repositoriesJava == null)
+        List()
+      else
+        repositoriesJava.asScala.toList
     })
   }
 
@@ -76,13 +82,21 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
 
   def getBranches(repository: Repository)(implicit invalidate: Boolean = false) = {
     cached(KeyType.getKey("", KeyType.getBranches, List(repository.getOwner.getName, repository.getName)) ,{
-      repoService.getBranches(repository).asScala
+      val branchesJava = repoService.getBranches(repository)
+      if(branchesJava == null)
+        List()
+      else
+        branchesJava.asScala.toList
     })
   }
 
   def getCommits(repository: Repository)(implicit invalidate: Boolean = false) = {
     cached(KeyType.getKey("", KeyType.getCommits, List(repository.getOwner.getName, repository.getName)) ,{
-      commitService.getCommits(repository)
+      val commitsJava = commitService.getCommits(repository)
+      if(commitsJava == null)
+        List()
+      else
+        commitsJava.asScala.toList
     })
   }
 
@@ -94,6 +108,13 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
       else
         Option(commit)
     })
+  }
+
+  def getTree(repository: Repository, sha: String) = {
+    val tree = TreeEx(
+      this.dataService.getTree(repository, sha, true))
+//commit.getTree.getTree.asScala.toList)
+    tree
   }
 
   def getAllRepositoriesJson() = {

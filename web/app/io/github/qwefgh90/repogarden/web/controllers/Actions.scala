@@ -2,7 +2,7 @@ package io.github.qwefgh90.repogarden.web.controllers
 
 import javax.inject._
 import scala.concurrent._
-import play.api._
+import play.api.Logger
 import play.api.cache._
 import play.api.mvc._
 import play.api.libs.json._
@@ -11,7 +11,7 @@ import play.api.mvc.Results._
 import org.eclipse.egit.github.core._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
 
-class ActionBuilder @Inject() (parser: BodyParsers.Default)(implicit ec: ExecutionContext, cache: AsyncCacheApi) extends ActionBuilderImpl(parser) {
+class ActionBuilder @Inject() (parser: play.api.mvc.BodyParsers.Default)(implicit ec: ExecutionContext, cache: SyncCacheApi) extends ActionBuilderImpl(parser) {
   override def invokeBlock[A](request: Request[A], block: (Request[A]) => Future[Result]) = {
     block(request)
   }
@@ -20,19 +20,29 @@ class ActionBuilder @Inject() (parser: BodyParsers.Default)(implicit ec: Executi
     def executionContext = ec
     def refine[A](req: Request[A]) = Future.successful {
       val signed = "signed".equals(req.session.get("signed").getOrElse(""))
-      val userOpt = try{
-        Option(Json.parse(req.session("user")).validate[User].get)
-      }catch{
-        case e: Exception => {
-          Logger.warn(e.toString)
-          Option.empty
+      val userJsResult = Json
+        .parse(req.session.get("user").getOrElse("{}"))
+        .validate[User]
+//        .getOrElse(new User)
+
+      val user = userJsResult match {
+        case success: JsSuccess[User] => success.get
+        case JsError(err) => {
+          Logger.debug(err.toString)
+          new User
         }
       }
 
-      Either.cond(signed && userOpt.isDefined ,
-      new UserRequest(userOpt.getOrElse(new User()), req), Unauthorized)
+      Logger.debug(s"id: ${user.getId}, ${user.getEmail}")
+
+      val tokenOpt =
+          cache
+            .get(user.getId.toString)
+
+      Either.cond(signed && tokenOpt.isDefined,
+      new UserRequest(user, tokenOpt.getOrElse(""), req), Unauthorized)
     }
   }
 }
 
-class UserRequest[A](val user: User, request: Request[A]) extends WrappedRequest[A](request)
+class UserRequest[A](val user: User, val token: String, request: Request[A]) extends WrappedRequest[A](request)
