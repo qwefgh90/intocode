@@ -34,9 +34,6 @@ import net.sf.ehcache.CacheManager;
 import play.api.Application
 
 class SwitchDaoSpec extends PlaySpec with GuiceOneAppPerSuite {
-  //it's hack for solving a global cache manager issue
-  //Before test, app must shutdown a instance of CacheManager
-  //CacheManager.getInstance().shutdown();
   override def fakeApplication(): Application = new GuiceApplicationBuilder()
 	  .in(Mode.Test)
 	  .build()
