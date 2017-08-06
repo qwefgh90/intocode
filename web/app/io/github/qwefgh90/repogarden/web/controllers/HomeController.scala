@@ -64,21 +64,26 @@ class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBui
   }
 
 
-  def getBranches = (builder andThen builder.UserAction).async { implicit request =>
+  def getBranches(owner: String, name: String) = (builder andThen builder.UserAction).async { implicit request =>
+
     val tokenFuture = cache.get[String](request.user.getId.toString)
     tokenFuture.map({ tokenOpt =>
       if(tokenOpt.isDefined){
         val githubService = githubProvider.getInstance(tokenOpt.get)
-        Ok
+        val list = githubService.getBranchesByName(owner, name)
+        Ok(Json.toJson(list))
       }else{
         Logger.warn(s"${request.user.getEmail} / ${request.user.getId} unauthorized")
         Unauthorized
       }
     })
   }
-    
+/*
+  def getCommits(owner: String, name: String, offset: Int, size: Int)  = (builder andThen builder.UserAction).async { implicit request =>
 
-  def getRepositories = (builder andThen builder.UserAction).async { implicit request =>
+  }*/
+ 
+/*  def getRepositories = (builder andThen builder.UserAction).async { implicit request =>
     val tokenFuture = cache.get[String](request.user.getId.toString)
     tokenFuture.map({ tokenOpt =>
       if(tokenOpt.isDefined){
@@ -94,5 +99,5 @@ class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBui
         BadRequest
       }
     })
-  }
+  }*/
 }

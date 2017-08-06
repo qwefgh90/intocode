@@ -15,6 +15,7 @@ import io.github.qwefgh90.repogarden.web.model.Implicits._
 import scala.concurrent.duration._
 import java.util.concurrent._
 import io.github.qwefgh90.repogarden.web.dao._
+import scala.util.Try
 
 @Singleton
 class GithubServiceProvider @Inject() (@NamedCache("github-api-cache") cache: AsyncCacheApi, switchDao: SwitchDao) {
@@ -78,6 +79,19 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     cached(KeyType.getKey(accessToken, KeyType.getRepository, List(owner, name)) ,{
       repoService.getRepository(owner, name)
     })
+  }
+
+
+  def getBranchesByName(owner: String, name: String)(implicit invalidate: Boolean = false): List[RepositoryBranch] = {
+    val repositoryTry = Try(getRepository(owner,name))
+    repositoryTry.map( repository =>
+      cached(KeyType.getKey("", KeyType.getBranches, List(repository.getOwner.getName, repository.getName)) ,{
+        val branchesJava = repoService.getBranches(repository)
+        if(branchesJava == null)
+          List()
+        else
+          branchesJava.asScala.toList
+      })).getOrElse(List())
   }
 
   def getBranches(repository: Repository)(implicit invalidate: Boolean = false) = {

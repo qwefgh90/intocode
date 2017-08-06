@@ -116,14 +116,6 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {//with GuiceOneApp
           session(result).data("signed") mustBe "signed"
           val user = session(result).data("user")
 
-          val result2 = homeController.getRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
-
-          timer{
-            status(result2)(60 seconds) mustBe OK
-          }((before, after) => {
-            Logger.debug(s"getRepositories() takes ${after-before} millis")
-          })
-
           val result3 = homeController.getOnlyRepositories(FakeRequest().withSession("signed" -> "signed", "user" -> user))
           timer{
             (contentAsJson(result3) \\ "yn").foreach(yn =>{
@@ -135,7 +127,6 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {//with GuiceOneApp
             Logger.debug(s"getOnlyRepositories() takes ${after-before} millis")
           })
         }
-
       }
     }
 
