@@ -65,7 +65,6 @@ class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBui
 
 
   def getBranches(owner: String, name: String) = (builder andThen builder.UserAction).async { implicit request =>
-
     val tokenFuture = cache.get[String](request.user.getId.toString)
     tokenFuture.map({ tokenOpt =>
       if(tokenOpt.isDefined){
@@ -78,26 +77,24 @@ class HomeController @Inject()(implicit ec: ExecutionContext, builder: ActionBui
       }
     })
   }
-/*
-  def getCommits(owner: String, name: String, offset: Int, size: Int)  = (builder andThen builder.UserAction).async { implicit request =>
 
-  }*/
- 
-/*  def getRepositories = (builder andThen builder.UserAction).async { implicit request =>
-    val tokenFuture = cache.get[String](request.user.getId.toString)
-    tokenFuture.map({ tokenOpt =>
-      if(tokenOpt.isDefined){
-        val githubService = githubProvider.getInstance(tokenOpt.get)
-        Ok(githubService.getAllRepositoriesJson)
-      }else{
-        Logger.warn(s"${request.user.getEmail} / ${request.user.getId} unauthorized")
-        Unauthorized
-      }
-    }).recover({
-      case e: Exception => {
-        Logger.warn(e.toString)
-        BadRequest
-      }
-    })
-  }*/
+  def getCommit(owner: String, name: String, sha: String) = (builder andThen builder.UserAction) { implicit request =>
+    val token = request.token
+    val githubService = githubProvider.getInstance(token)
+    val repoOpt = githubService.getRepository(owner, name)
+    repoOpt.map(repo => {
+      val commitOpt = githubService.getCommit(repo, sha)
+      commitOpt.map(commit => Ok(Json.toJson(commit)(commitWritesToBrowser))).getOrElse({BadRequest("a requested commit does not exists.")})
+    }).getOrElse(BadRequest("a requested commit not exists."))
+  }
+
+  def getTree(owner: String, name: String, sha: String) = (builder andThen builder.UserAction) { implicit request =>
+    val token = request.token
+    val githubService = githubProvider.getInstance(token)
+    val repoOpt = githubService.getRepository(owner, name)
+    repoOpt.map(repo => {
+      val treeOpt = githubService.getTree(repo, sha)
+      treeOpt.map(tree => Ok(Json.toJson(tree)(treeExWritesToBrowser))).getOrElse(BadRequest("a requested tree does not exists"))
+    }).getOrElse(BadRequest("a requested tree does not exists"))
+  }
 }

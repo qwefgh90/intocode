@@ -75,16 +75,17 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     })
   }
 
-  def getRepository(owner: String, name: String)(implicit invalidate: Boolean = false): Repository = {
-    cached(KeyType.getKey(accessToken, KeyType.getRepository, List(owner, name)) ,{
+  def getRepository(owner: String, name: String)(implicit invalidate: Boolean = false): Option[Repository] = {
+    val repo = cached(KeyType.getKey(accessToken, KeyType.getRepository, List(owner, name)) ,{
       repoService.getRepository(owner, name)
     })
+    if(repo == null) None else Some(repo)
   }
 
 
   def getBranchesByName(owner: String, name: String)(implicit invalidate: Boolean = false): List[RepositoryBranch] = {
-    val repositoryTry = Try(getRepository(owner,name))
-    repositoryTry.map( repository =>
+    val repositoryOpt = getRepository(owner,name)
+    repositoryOpt.map( repository =>
       cached(KeyType.getKey("", KeyType.getBranches, List(repository.getOwner.getName, repository.getName)) ,{
         val branchesJava = repoService.getBranches(repository)
         if(branchesJava == null)
@@ -124,11 +125,10 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     })
   }
 
-  def getTree(repository: Repository, sha: String) = {
-    val tree = TreeEx(
-      this.dataService.getTree(repository, sha, true))
-//commit.getTree.getTree.asScala.toList)
-    tree
+  def getTree(repository: Repository, sha: String): Option[TreeEx] = {
+    val tree = this.dataService.getTree(repository, sha, true)
+    val treeOpt = if(tree == null) None else Some(tree)
+    treeOpt.map(tree => TreeEx(tree))
   }
 
   def getAllRepositoriesJson() = {

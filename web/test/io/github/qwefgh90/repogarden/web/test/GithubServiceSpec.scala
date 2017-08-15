@@ -60,7 +60,7 @@ class GithubServiceSpec extends FlatSpec with Matchers with GuiceOneAppPerSuite 
         commitOpt.map { commit => {
           Logger.debug(s"commit: ${commit.getCommit.getMessage}, ${commit.getSha}")
           Logger.debug(s"tree: ${commit.getCommit.getTree.getUrl}")
-          val tree = githubService.getTree(repo, commit.getCommit.getTree.getSha)
+          val tree = githubService.getTree(repo, commit.getCommit.getTree.getSha).get
           Logger.debug("\n" + tree.filterBlob(_.name.endsWith(".cpp")).list.map(entry => entry.level + " " + (" " * entry.level) + entry.entry.getPath).mkString("\n"))
         }
         }

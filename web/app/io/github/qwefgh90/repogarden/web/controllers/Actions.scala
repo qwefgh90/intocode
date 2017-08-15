@@ -40,7 +40,7 @@ class ActionBuilder @Inject() (parser: play.api.mvc.BodyParsers.Default)(implici
             .get(user.getId.toString)
 
       Either.cond(signed && tokenOpt.isDefined,
-      new UserRequest(user, tokenOpt.getOrElse(""), req), Unauthorized)
+      new UserRequest(user, tokenOpt.get, req), Unauthorized)
     }
   }
 }

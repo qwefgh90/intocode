@@ -105,7 +105,7 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {//with GuiceOneApp
         }
       } { implicit port =>
         WsTestClient.withClient { mockClient =>
-          val mockAuthService = new AuthService(configuration, encryption, mockClient, context, "")
+ g         val mockAuthService = new AuthService(configuration, encryption, mockClient, context, "")
           val authController = new AuthController(mockAuthService, context, cache, githubProvider)
 
           val fr = FakeRequest().withJsonBody(Json.parse("""{"code":"code", "state":"state", "clientId":"clientId"}"""))

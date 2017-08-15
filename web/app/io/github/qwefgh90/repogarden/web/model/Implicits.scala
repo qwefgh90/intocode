@@ -71,8 +71,28 @@ object Implicits extends RepositoryExtension {
         "date" -> commit.getCommitter.getDate,
         "committerEmail" -> commit.getCommitter.getEmail,
         "committerName" -> commit.getCommitter.getName,
-        "url" -> commit.getUrl
+        "url" -> commit.getUrl,
+        "treeSha" -> commit.getTree.getSha
       )
+    }
+  }
+
+  implicit val treeEntryWritesToBrowser = new Writes[io.github.qwefgh90.repogarden.bp.github.Implicits.TreeEntryEx] {
+    def writes(entry: io.github.qwefgh90.repogarden.bp.github.Implicits.TreeEntryEx) = {
+      Json.obj(
+        "seq" -> entry.seq,
+        "level" -> entry.level,
+        "name" -> entry.name,
+        "path" -> entry.entry.getPath,
+        "sha" -> entry.entry.getSha,
+        "url" -> entry.entry.getUrl
+      )
+    }
+  }
+
+  implicit val treeExWritesToBrowser = new Writes[io.github.qwefgh90.repogarden.bp.github.Implicits.TreeEx] {
+    def writes(tree: io.github.qwefgh90.repogarden.bp.github.Implicits.TreeEx) = {
+      Json.arr(tree.list)
     }
   }
 
