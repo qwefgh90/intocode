@@ -44,6 +44,10 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
     db.run(typos += typo)
   }
 
+  def insertTypos(typoList: Seq[Typo]): Future[Option[Int]] = {
+    db.run(typos ++= typoList)
+  }
+
   def selectTypoList(id: Long): Future[Seq[Typo]] = {
     db.run(typos.filter(_.parentId === id).result)
   }

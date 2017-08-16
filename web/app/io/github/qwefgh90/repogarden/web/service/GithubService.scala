@@ -125,10 +125,15 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     })
   }
 
-  def getTree(repository: Repository, sha: String): Option[TreeEx] = {
+  def getTree(repository: Repository, sha: String)(implicit sync: Boolean = false): Option[TreeEx] = {
     val tree = this.dataService.getTree(repository, sha, true)
     val treeOpt = if(tree == null) None else Some(tree)
-    treeOpt.map(tree => TreeEx(tree))
+    treeOpt.map(tree => {
+      val initTree = TreeEx(tree)
+      if(sync)
+        initTree.syncContents(repository, this.dataService)
+      initTree
+    })
   }
 
   def getAllRepositoriesJson() = {
