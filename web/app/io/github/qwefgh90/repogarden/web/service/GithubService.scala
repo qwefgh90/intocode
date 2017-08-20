@@ -1,6 +1,7 @@
 package io.github.qwefgh90.repogarden.web.service
 
 import play.api.cache._
+import play.api._
 import javax.inject._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
@@ -105,6 +106,17 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     })
   }
 
+  def getBranchByBranchName(repository: Repository, branchName: String)(implicit invalidate: Boolean = false) = {
+    getBranches(repository).find(b => b.getName == branchName)
+  }
+
+  def getLastestCommitByBranchName(repository: Repository, branchName: String)(implicit invalidate: Boolean = false) = {
+    val branchOpt = getBranchByBranchName(repository, branchName)
+    branchOpt.flatMap(b => {
+      getCommit(repository, b.getCommit.getSha)
+    })
+  }
+
   def getCommits(repository: Repository)(implicit invalidate: Boolean = false) = {
     cached(KeyType.getKey("", KeyType.getCommits, List(repository.getOwner.getName, repository.getName)) ,{
       val commitsJava = commitService.getCommits(repository)
@@ -129,6 +141,7 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     val tree = this.dataService.getTree(repository, sha, true)
     val treeOpt = if(tree == null) None else Some(tree)
     treeOpt.map(tree => {
+      Logger.debug("getTree: " + sync)
       val initTree = TreeEx(tree)
       if(sync)
         initTree.syncContents(repository, this.dataService)

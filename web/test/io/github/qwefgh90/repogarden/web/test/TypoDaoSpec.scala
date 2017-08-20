@@ -28,7 +28,7 @@ import org.eclipse.egit.github.core._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
 import io.github.qwefgh90.repogarden.web.model.Typo
 import io.github.qwefgh90.repogarden.web.model.TypoStat
-import io.github.qwefgh90.repogarden.web.model.State
+import io.github.qwefgh90.repogarden.web.model.TypoStatus
 import io.github.qwefgh90.repogarden.bp.Boilerplate._
 import java.util.concurrent._
 import scala.concurrent.Future
@@ -47,12 +47,12 @@ class TypoDaoSpec extends PlaySpec with GuiceOneAppPerSuite {
   "SwitchDao" should {
     "execute CRUD operations nomally" in {
       val currentTime = System.currentTimeMillis()
-      val ownerId = "1"
-      val repoId = "1"
+      val ownerId = 1
+      val repoId = 1
       val branchName = "master"
       val commitSha = "abcdsha"
-      val userId = "2"
-      val stat = TypoStat(Option.empty, ownerId, repoId, branchName, commitSha, Some(currentTime), None, "message field", State.PROGRESS.toString, userId)
+      val userId = 2
+      val stat = TypoStat(Option.empty, ownerId, repoId, branchName, commitSha, Some(currentTime), None, "message field", TypoStatus.PROGRESS.toString, userId)
       val result1 = typoDao.insertTypoStat(stat)
       val idx = Await.result(result1, Duration(10, TimeUnit.SECONDS))
       val typo1 = Typo(idx, "src/main/scala/main.scala", "treeSha", 3, "{a:123}", "text: hello")
