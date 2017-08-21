@@ -45,7 +45,13 @@ lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(bp).d
     libraryDependencies += "com.typesafe.play" %% "play-ws-standalone-json" % "1.0.1",
     libraryDependencies += "com.typesafe.play" %% "play-ws-standalone-xml" % "1.0.1",
     libraryDependencies += "com.typesafe.play" %% "play-slick" % "3.0.0",
-    libraryDependencies += "com.h2database" % "h2" % "1.4.196" % "test"
+    libraryDependencies += "com.h2database" % "h2" % "1.4.196",
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-actor" % "2.5.4",
+      "com.typesafe.akka" %% "akka-testkit" % "2.5.4" % Test,
+      "com.typesafe.akka" %% "akka-cluster" % "2.5.4",
+      "com.typesafe.akka" %% "akka-cluster-tools" % "2.5.4"
+    )
   )
 
 lazy val victims_client = (project in file("victims-client")).dependsOn(bp).
