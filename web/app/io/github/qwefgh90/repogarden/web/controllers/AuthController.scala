@@ -12,11 +12,12 @@ import scala.concurrent.Future
 import io.github.qwefgh90.repogarden.web.model._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
 import io.github.qwefgh90.repogarden.web.service.AuthService
+import io.github.qwefgh90.repogarden.web.service.AuthServiceTrait
 import io.github.qwefgh90.repogarden.web.service.GithubService
 import io.github.qwefgh90.repogarden.web.service.GithubServiceProvider
 
 @Singleton
-class AuthController @Inject()(authService: AuthService, implicit val context: ExecutionContext, cache: AsyncCacheApi, githubProvider: GithubServiceProvider) extends Controller {
+class AuthController @Inject()(authService: AuthServiceTrait, implicit val context: ExecutionContext, cache: AsyncCacheApi, githubProvider: GithubServiceProvider) extends Controller {
   def client = Action { implicit request =>
     val client_id = authService.getClientId
     val state = authService.getState

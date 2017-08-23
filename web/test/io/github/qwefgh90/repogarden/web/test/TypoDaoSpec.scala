@@ -42,7 +42,7 @@ class TypoDaoSpec extends PlaySpec with GuiceOneAppPerSuite {
 	  .build()
 
   val typoDao = app.injector.instanceOf[TypoDao]
-  typoDao.create()
+  Await.ready(typoDao.create(), Duration(10, TimeUnit.SECONDS))
 
   "SwitchDao" should {
     "execute CRUD operations nomally" in {

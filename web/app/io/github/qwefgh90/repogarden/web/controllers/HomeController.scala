@@ -23,14 +23,14 @@ import akka.stream.Materializer
  * application's home page.
  */
 @Singleton
-class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider, switchDao: SwitchDao, @Named("pub-actor") pubActor: ActorRef)(implicit ec: ExecutionContext, implicit val actorSystem: ActorSystem, materializer: Materializer) extends Controller with SameOriginCheck {
+class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider, switchDao: SwitchDao, @Named("pub-actor") pubActor: ActorRef, configuration: Configuration)(implicit ec: ExecutionContext, implicit val actorSystem: ActorSystem, materializer: Materializer) extends Controller with SameOriginCheck {
 
   import io.github.qwefgh90.repogarden.web.actor.PubActor._
 
   def ws = WebSocket.acceptOrResult[JsValue, JsValue] { rh =>
     val channelIdOpt = rh.getQueryString("ch")
     Future.successful(
-      if(!sameOriginCheck(rh))
+      if(!sameOriginCheck(rh, configuration))
         Left(Forbidden)
       else if(channelIdOpt.isEmpty)
         Left(BadRequest)
@@ -131,9 +131,9 @@ trait SameOriginCheck {
    * See https://tools.ietf.org/html/rfc6455#section-1.3 and
    * http://blog.dewhurstsecurity.com/2013/08/30/security-testing-html5-websockets.html
    */
-  def sameOriginCheck(rh: RequestHeader): Boolean = {
+  def sameOriginCheck(rh: RequestHeader, configuration: Configuration): Boolean = {
     rh.headers.get("Origin") match {
-      case Some(originValue) if originMatches(originValue) =>
+      case Some(originValue) if originMatches(originValue, configuration) =>
         Logger.debug(s"originCheck: originValue = $originValue")
         true
 
@@ -147,13 +147,14 @@ trait SameOriginCheck {
     }
   }
 
-  /**
-   * Returns true if the value of the Origin header contains an acceptable value.
-   *
-   * This is probably better done through configuration same as the allowedhosts filter.
-   */
-  def originMatches(origin: String): Boolean = {
-    origin.contains("localhost:9000") || origin.contains("localhost:9001") || origin.contains("www.websocket.org")
-  }
 
+  /**
+    * Returns true if the value of the Origin header contains an acceptable value.
+    *
+    * This is probably better done through configuration same as the allowedhosts filter.
+    */
+  def originMatches(origin: String, configuration: Configuration): Boolean = {
+    val acceptList = configuration.get[Seq[String]]("play.acceptOriginList")
+    acceptList.exists(e => origin.contains(e))
+  }
 }

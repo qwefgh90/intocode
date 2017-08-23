@@ -18,10 +18,21 @@ import play.api.libs.functional.syntax._
 import play.Logger
 
 /**
+ * this interface is for AuthService and MockAuthService.
+ */
+
+trait AuthServiceTrait {
+  case class AccessToken(token: String, tokenType: String)
+  def getState: String
+  def getClientId: String
+  def getAccessToken(code: String, state: String, clientId: String): Future[String]
+}
+
+/**
  * 
  */
 @Singleton
-class AuthService (configuration: Configuration, encryption: Encryption, ws: WSClient, context: ExecutionContext, baseOAuthBaseUrl: String) {
+class AuthService (configuration: Configuration, encryption: Encryption, ws: WSClient, context: ExecutionContext, baseOAuthBaseUrl: String) extends AuthServiceTrait {
   @Inject def this(configuration: Configuration, encryption: Encryption, ws: WSClient, context: ExecutionContext)
     = this(configuration, encryption, ws, context, configuration.getString("play.baseOAuthBaseUrl").getOrElse("https://github.com"))
   
@@ -35,7 +46,6 @@ class AuthService (configuration: Configuration, encryption: Encryption, ws: WSC
   private val encoder = Base64.getUrlEncoder
   private val decoder = Base64.getUrlDecoder
 
-  case class AccessToken(token: String, tokenType: String)
   implicit val accessTokenRead: Reads[AccessToken] = (
     (JsPath \ "access_token").read[String] and
     (JsPath \ "token_type").read[String]
@@ -46,15 +56,15 @@ class AuthService (configuration: Configuration, encryption: Encryption, ws: WSC
    * it must be unsuggestable random string.
    */
   @deprecated("It is not able to make safe keys which can be suggestable", "AuthService.scala")
-  def getState: String = {
+  override def getState: String = {
     val plainText = System.currentTimeMillis.toString.getBytes 
     val encrypted = encryption.encrypt(plainText)
     encoder.encodeToString(encrypted)
   }
   
-  def getClientId: String = clientId.get
+  override def getClientId: String = clientId.get
   
-  def getAccessToken(code: String, state: String, clientId: String): Future[String] = {
+  override def getAccessToken(code: String, state: String, clientId: String): Future[String] = {
     val response: Future[WSResponse] = ws.url(baseOAuthBaseUrl + accessTokenPath.get)
       .withHeaders("Accept" -> "application/json")
       .post(Map("client_id" -> Seq(clientId)

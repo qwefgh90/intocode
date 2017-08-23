@@ -16,13 +16,17 @@ class ClientActor(out: ActorRef, rh: RequestHeader, channelId: String) extends A
   val mediator = DistributedPubSub(context.system).mediator
   mediator ! Subscribe(channelId, self)
 
+  import PubActor._
   def receive = {
     case jsValue: JsValue =>
       out ! jsValue
     case SubscribeAck(Subscribe(channelId, None, `self`)) ⇒{
       Logger.debug(s"A channel is open: ${channelId}")
       Logger.debug(s"${rh.remoteAddress} starts to subscribe: ${channelId}")
-
+    }
+    case Poison => {
+      Logger.debug("terminate: " + channelId.toString)
+      context.stop(self)
     }
   }
 }

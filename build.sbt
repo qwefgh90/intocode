@@ -34,10 +34,7 @@ lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(bp).d
   	libraryDependencies += ws,
     libraryDependencies += guice,
     libraryDependencies += ehcache,
-
-//    libraryDependencies += ehcache,
-//    libraryDependencies += jcache,
-//    libraryDependencies += "org.jsr107.ri" % "cache-annotations-ri-guice" % "1.0.0",
+    libraryDependencies += specs2 % Test,
     libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.0",
     libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1",
     libraryDependencies += "com.typesafe.play" %% "play-iteratees-reactive-streams" % "2.6.1",
@@ -51,7 +48,8 @@ lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(bp).d
       "com.typesafe.akka" %% "akka-testkit" % "2.5.4" % Test,
       "com.typesafe.akka" %% "akka-cluster" % "2.5.4",
       "com.typesafe.akka" %% "akka-cluster-tools" % "2.5.4"
-    )
+    ),
+    libraryDependencies += "io.backchat.hookup" %% "hookup" % "0.4.2" % Test
   )
 
 lazy val victims_client = (project in file("victims-client")).dependsOn(bp).

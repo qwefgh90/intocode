@@ -15,6 +15,7 @@ import play.core.server.Server
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import play.api.libs.json._
+import play.api._
 import play.api.Configuration
 import scala.concurrent._
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
@@ -22,6 +23,8 @@ import play.api.routing.sird.UrlContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import net.sf.ehcache.CacheManager
 import play.api.Application
+import play.core.server._
+import play.api.Logger
 
 /**
   * Add your spec here.
@@ -30,10 +33,8 @@ import play.api.Application
   * For more information, see https://www.playframework.com/documentation/latest/ScalaTestingWithScalaTest
   */
 class AuthServiceSpec extends PlaySpec with GuiceOneAppPerSuite {
-  //it's hack for solving a global cache manager issue
-  //Before test, app must shutdown a instance of CacheManager
-  //CacheManager.getInstance().shutdown();
-  
+  import com.typesafe.config._
+
   override def fakeApplication(): Application = new GuiceApplicationBuilder()
 	.in(Mode.Test)
 	.build()
@@ -43,20 +44,23 @@ class AuthServiceSpec extends PlaySpec with GuiceOneAppPerSuite {
   val configuration = app.injector.instanceOf[Configuration]
   val context = app.injector.instanceOf[ExecutionContext]
 
+  val randomRemotePort = "1234"
+  val baseServerConfig = ServerConfig()
+  val newConfig = configuration ++ Configuration("akka.remote.netty.tcp.port" -> randomRemotePort, "akka.cluster.seed-nodes.0" -> ("akka.tcp://ClusterSystem@127.0.0.1:" + randomRemotePort.toString)) 
+  val serverConfig = ServerConfig(
+    baseServerConfig.rootDir,
+    Some(0),
+    baseServerConfig.sslPort,
+    baseServerConfig.address,
+    Mode.Test,
+    baseServerConfig.properties,
+    newConfig)
+   
   "AuthService" should {
 	"return access token" in {
-	  import play.api.routing.sird._
-	  Server.withRouter() {
-        case play.api.routing.sird.POST(p"/login/oauth/access_token") => Action {
-          Results.Ok(Json.obj("access_token" -> "fake token","token_type" -> "type"))
-        }
-      } { implicit port =>
-        WsTestClient.withClient { clientToMock =>
-          val authService = new AuthService(configuration, encryption, clientToMock, context, "")
-          val result = Await.result(authService.getAccessToken("code", "state", "clientId"), 10.seconds)
-          assert(result.equals("fake token"))
-        }
-      }
+      val authService = new MockAuthService(accessToken = "fake token")(context)
+      val result = Await.result(authService.getAccessToken("code", "state", "clientId"), 10.seconds)
+      assert(result.equals("fake token"))
 	}
   }
   
