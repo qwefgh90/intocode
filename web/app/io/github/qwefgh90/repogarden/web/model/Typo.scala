@@ -1,6 +1,6 @@
 package io.github.qwefgh90.repogarden.web.model
 
-import io.github.qwefgh90.repogarden.web.model.TypoStatus._
+//import io.github.qwefgh90.repogarden.web.model.TypoStatus._
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
 import io.github.qwefgh90.repogarden.web.service.GithubService
 
@@ -30,3 +30,9 @@ assert(repoOpt.isDefined)
 }
 
 case class TypoRequest(ownerId: Long, repositoryId: Long, branchName: String, commitSha: String, userId: Long, treeEx: TreeEx)
+
+object TypoStatus extends Enumeration{
+  type TypoStatus = Value
+  val PROGRESS, FINISHED, FAILED = Value
+}
+ 

@@ -25,22 +25,28 @@ import akka.stream.Materializer
 @Singleton
 class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider, switchDao: SwitchDao, @Named("pub-actor") pubActor: ActorRef, configuration: Configuration)(implicit ec: ExecutionContext, implicit val actorSystem: ActorSystem, materializer: Materializer) extends Controller with SameOriginCheck {
 
-  import io.github.qwefgh90.repogarden.web.actor.PubActor._
-
+  /**
+    * Verify and accept a request to subscribe a channel.
+    * 
+    */
   def ws = WebSocket.acceptOrResult[JsValue, JsValue] { rh =>
     val channelIdOpt = rh.getQueryString("ch")
-    Future.successful(
+    val userOpt = builder.checker.getUserFromSession(rh)
+    val tokenOpt = userOpt.flatMap{user => builder.checker.getTokenOfUser(user)}
+    Future.successful{
       if(!sameOriginCheck(rh, configuration))
         Left(Forbidden)
       else if(channelIdOpt.isEmpty)
         Left(BadRequest)
+      else if(tokenOpt.isEmpty)
+        Left(Unauthorized)
       else
         Right(ActorFlow.actorRef { out =>
-          ClientActor.props(out, rh, channelIdOpt.get)
+          ClientActor.props(out, rh, channelIdOpt.get, userOpt.get)
         })
-    )
-  }
+    }
 
+  }
 
   /**
    * Create an Action to render an HTML page.
@@ -50,7 +56,6 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
    * a path of `/`.
    */
   def index = Action { implicit request =>
-    pubActor ! PubMessage("12341234", Json.parse("""{"a":1234}"""))
     Ok(io.github.qwefgh90.repogarden.web.views.html.index()).withNewSession
   }
 

@@ -28,9 +28,6 @@ trait AuthServiceTrait {
   def getAccessToken(code: String, state: String, clientId: String): Future[String]
 }
 
-/**
- * 
- */
 @Singleton
 class AuthService (configuration: Configuration, encryption: Encryption, ws: WSClient, context: ExecutionContext, baseOAuthBaseUrl: String) extends AuthServiceTrait {
   @Inject def this(configuration: Configuration, encryption: Encryption, ws: WSClient, context: ExecutionContext)

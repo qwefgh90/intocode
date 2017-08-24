@@ -141,10 +141,10 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     val tree = this.dataService.getTree(repository, sha, true)
     val treeOpt = if(tree == null) None else Some(tree)
     treeOpt.map(tree => {
-      Logger.debug("getTree: " + sync)
       val initTree = TreeEx(tree)
-      if(sync)
+      if(sync){
         initTree.syncContents(repository, this.dataService)
+      }
       initTree
     })
   }

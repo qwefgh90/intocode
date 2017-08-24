@@ -8,8 +8,8 @@ import akka.cluster.pubsub._
 import akka.cluster.pubsub.DistributedPubSubMediator.{ Subscribe, SubscribeAck, Publish }
 
 object PubActor {
-  case class PubMessage(id: String, value: JsValue)
-  case class TerminateMessage(id: String)
+  case class PubMessage(id: Long, value: JsValue)
+  case class TerminateMessage(id: Long, value: Option[JsValue])
   case object Poison
 }
 
@@ -19,8 +19,11 @@ class PubActor @Inject() (configuration: Configuration) extends Actor {
 
   def receive = {
     case PubMessage(id, value) ⇒
-      mediator ! Publish(id, value)
-    case TerminateMessage(id) =>
-      mediator ! Publish(id, Poison)
+      mediator ! Publish(id.toString, value)
+    case TerminateMessage(id, valueOpt) =>
+      valueOpt.map{value => 
+        mediator ! Publish(id.toString, value)
+      }
+      mediator ! Publish(id.toString, Poison)
   }
 }

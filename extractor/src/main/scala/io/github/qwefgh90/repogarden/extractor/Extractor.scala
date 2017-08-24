@@ -41,8 +41,19 @@ object Extractor {
     		  for(comment <- list; str = new String(comment.charArray))
     			  yield ExtractResult(comment.startOffset, str, uri)
     	  }
-  	  }
-		}.asInstanceOf[Option[List[ExtractResult]]]
+  	      }
+	  }.asInstanceOf[Option[List[ExtractResult]]]
+  }
+
+  def extractCommentsByStream(is: InputStream, fileName: String, charset: Charset = StandardCharsets.UTF_8): Option[List[ExtractResult]] = {
+	val tempFile = File.createTempFile("will be deleted", "will be deleted");
+  	tempFile.deleteOnExit()
+    val result = extractComments(is, JSearch.getContentType(tempFile, fileName), charset)
+    result.map{list => {
+      for(comment <- list; str = new String(comment.charArray))
+      yield ExtractResult(comment.startOffset, str, tempFile.toURI)
+    }
+  	}.asInstanceOf[Option[List[ExtractResult]]]
   }
 
   /** Extract a list of byte arrays from a stream.

@@ -38,7 +38,18 @@ import play.api.Application
 import io.github.qwefgh90.repogarden.web.service.GithubServiceProvider
 import io.github.qwefgh90.repogarden.web.service.TypoService
 
-class TypoServiceSpec extends FlatSpec with Matchers with GuiceOneAppPerSuite {
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.time.{Span, Seconds}
+import org.scalatest.concurrent.{Eventually}
+import org.scalatest.concurrent.Eventually._
+import io.backchat.hookup._
+import scala.collection.mutable._
+import akka.actor.ActorRef
+import akka.actor.{Actor, Props}
+import akka.actor.ActorSystem
+import java.net.URI
+
+class TypoServiceSpec extends MockWebServer {//extends PlaySpec with GuiceOneAppPerSuite {
   val oauthToken = System.getProperties.getProperty("oauthToken")
   val oauthTokenOpt = if(oauthToken == null)
 	Option.empty
@@ -47,9 +58,9 @@ class TypoServiceSpec extends FlatSpec with Matchers with GuiceOneAppPerSuite {
   
   require(oauthTokenOpt.isDefined)
   
-  override def fakeApplication(): Application = new GuiceApplicationBuilder()
+  /*override def fakeApplication(): Application = new GuiceApplicationBuilder()
 	.in(Mode.Test)
-	.build()
+	.build()*/
 
   val provider = app.injector.instanceOf[GithubServiceProvider]
   val typoService = app.injector.instanceOf[TypoService]
@@ -60,25 +71,48 @@ class TypoServiceSpec extends FlatSpec with Matchers with GuiceOneAppPerSuite {
   typoDao.create()
   switchDao.create()
 
-  "TypoService" should "start finding typos" in {
-/*    val repoOpt = githubService.getRepository("qwefgh90", "RepogardenTest")
-assert(repoOpt.isDefined)
-    val repo = repoOpt.get
-    val ownerId: Long = repo.getOwner.getId
-    val repositoryId = repo.getId
-    val branchName = "master"
-    val commit = githubService.getLastestCommitByBranchName(repo, branchName).get
-    val userId: Long = githubService.getUser.getId
-    val treeEx = githubService.getTree(repo, commit.getCommit.getTree.getSha).get
-    TypoRequest(ownerId, repositoryId, branchName, commit.getSha, userId, treeEx)
-*/
+  "TypoService" should {
+    "start finding typos and subscribe messages" in {
 
-    val req = TypoRequest.createLastRequest(githubService, "qwefgh90", "RepogardenTest", "master")
-    Logger.debug(req.toString)
-    val future = typoService.build(req)
-    val id = Await.result(future, Duration(60, TimeUnit.SECONDS))
-    /*
-    val typoList = Await.result(typoDao.selectTypoList(id), Duration(60, TimeUnit.SECONDS))
-    typoList.foreach(typo => Logger.debug(typo.components))*/
+      val req = TypoRequest.createLastRequest(githubService, "qwefgh90", "RepogardenTest", "master")
+      Logger.debug(req.toString)
+      val future = typoService.build(req, Duration(2, TimeUnit.SECONDS))
+      val id = Await.result(future, Duration(20, TimeUnit.SECONDS))
+
+      val hookupClient = new DefaultHookupClient(HookupClientConfig(URI.create(s"ws://localhost:${port}/ws?ch=${id}"))) {
+        val messages = ListBuffer[String]()
+
+        def receive = {
+          case Connected =>{
+            Logger.debug("Connected")
+          }
+          case Disconnected(_) =>
+            messages += "disconnected"
+            Logger.debug("Disconnected")
+
+          case JsonMessage(json) =>
+            messages += json.toString
+            Logger.debug("Json message = " + json.toString)
+
+          case TextMessage(text) =>
+            messages += text
+            Logger.debug("Text message = " + text)
+        }
+
+        connect() onSuccess {
+          case Success => {
+            Logger.debug("Send text message")
+          }
+        }
+      }
+
+      eventually(new Timeout(Span(20, Seconds))){
+        hookupClient.messages.exists(e => e.contains("FINISHED")) mustBe true
+      }
+
+      // typoDao.selectTypoList(id).onSuccess{
+      //   case list => Logger.debug(list.toString)
+      // }
+    }
   }
 }

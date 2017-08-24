@@ -1,6 +1,5 @@
 package io.github.qwefgh90.repogarden.web.test
-import play.api.inject.ApplicationLifecycle
-import play.api.inject.BindingKey
+import play.api.inject.{ApplicationLifecycle, BindingKey, bind}
 import play.api.cache._
 import org.scalatestplus.play._
 import org.scalatestplus.play.guice._
@@ -35,23 +34,28 @@ import io.github.qwefgh90.repogarden.bp.Boilerplate._
 import play.api.Application
 import java.util.concurrent._
 
-class WebsocketSpec extends PlaySpec with BeforeAndAfterAll {
-
+trait MockWebServer extends PlaySpec with BeforeAndAfterAll {
   val port = 15551
-
-  val app = new GuiceApplicationBuilder()
-    .configure("play.acceptOriginList" -> Seq("localhost:" + port))
-	.in(Mode.Test)
-	.build()
+  val app: Application =
+    new GuiceApplicationBuilder()
+      .configure("play.acceptOriginList" -> Seq("localhost:" + port))
+      .overrides(bind[UserSessionChecker].to[MockUserSessionChecker])
+	  .in(Mode.Test)
+	  .build()
+  val tserver = TestServer(port, app)
 
   override def beforeAll() {
+    tserver.start()
     // start up your web server or whatever
   }
 
   override def afterAll() {
+    tserver.stop()
     app.stop() // shut down the web server
   }
+}
 
+class WebsocketSpec extends MockWebServer {
   "Websocket controller" should {
     import io.github.qwefgh90.repogarden.web.actor.{PubActor, ClientActor}
     import io.github.qwefgh90.repogarden.web.actor.PubActor._
@@ -61,52 +65,89 @@ class WebsocketSpec extends PlaySpec with BeforeAndAfterAll {
     import akka.actor.{Actor, Props}
     import akka.actor.ActorSystem
     import java.net.URI
-    import play.api.test.WithServer
 
     val actorRef = app.injector.instanceOf(BindingKey(classOf[ActorRef]).qualifiedWith("pub-actor"))
 
+    "accept a client and terminate a connection" in {
+      val channelId: Long = 1234
+      val hookupClient = new DefaultHookupClient(HookupClientConfig(URI.create(s"ws://localhost:${port}/ws?ch=${channelId}"))) {
+        val messages = ListBuffer[String]()
+
+        def receive = {
+          case Connected =>{
+            Logger.debug("Connected")
+            actorRef ! PubMessage(channelId, Json.parse("""{"id":"1234"}"""))
+          }
+          case Disconnected(_) =>
+            messages += "disconnected"
+            Logger.debug("Disconnected")
+
+          case JsonMessage(json) =>
+            messages += json.toString
+            Logger.debug("Json message = " + json.toString)
+
+          case TextMessage(text) =>
+            messages += text
+            Logger.debug("Text message = " + text)
+        }
+
+        connect() onSuccess {
+          case Success => {
+            Logger.debug("Send text message")
+          }
+        }
+      }
+      import org.scalatest.concurrent.PatienceConfiguration.Timeout
+      import org.scalatest.time.{Span, Seconds}
+      eventually(new Timeout(Span(2, Seconds))){
+        hookupClient.messages.exists(e => e.contains("1234")) mustBe true
+      }
+
+      actorRef ! TerminateMessage(channelId, None)
+      eventually(new Timeout(Span(2, Seconds))){
+        hookupClient.messages.exists(e => e.contains("disconnected")) mustBe true
+      }
+    }
+
     "accept a client" in {
-      new WithServer(app = app, port = port) {
-        val channelId = "1234"
-        val hookupClient = new DefaultHookupClient(HookupClientConfig(URI.create(s"ws://localhost:${port}/ws?ch=${channelId}"))) {
-          val messages = ListBuffer[String]()
+      val channelId: Long = 1234
+      val hookupClient = new DefaultHookupClient(HookupClientConfig(URI.create(s"ws://localhost:${port}/ws?ch=${channelId}"))) {
+        val messages = ListBuffer[String]()
 
-          def receive = {
-            case Connected =>{
-              Logger.debug("Connected")
-              actorRef ! PubMessage(channelId, Json.parse("""{"id":"1234"}"""))
-            }
-            case Disconnected(_) =>
-              messages += "disconnected"
-              Logger.debug("Disconnected")
-
-            case JsonMessage(json) =>
-              messages += json.toString
-              Logger.debug("Json message = " + json.toString)
-
-            case TextMessage(text) =>
-              messages += text
-              Logger.debug("Text message = " + text)
+        def receive = {
+          case Connected =>{
+            Logger.debug("Connected")
+            actorRef ! PubMessage(channelId, Json.parse("""{"id":"1234"}"""))
           }
+          case Disconnected(_) =>
+            messages += "disconnected"
+            Logger.debug("Disconnected")
 
-          connect() onSuccess {
-            case Success => {
-              Logger.debug("Send text message")
-            }
+          case JsonMessage(json) =>
+            messages += json.toString
+            Logger.debug("Json message = " + json.toString)
+
+          case TextMessage(text) =>
+            messages += text
+            Logger.debug("Text message = " + text)
+        }
+
+        connect() onSuccess {
+          case Success => {
+            Logger.debug("Send text message")
           }
         }
-        import org.scalatest.concurrent.PatienceConfiguration.Timeout
-        import org.scalatest.time.{Span, Seconds}
-        eventually(new Timeout(Span(2, Seconds))){
-          hookupClient.messages.exists(e => e.contains("1234")) mustBe true
-        }
+      }
+      import org.scalatest.concurrent.PatienceConfiguration.Timeout
+      import org.scalatest.time.{Span, Seconds}
+      eventually(new Timeout(Span(2, Seconds))){
+        hookupClient.messages.exists(e => e.contains("1234")) mustBe true
+      }
 
-        actorRef ! TerminateMessage(channelId)
-        eventually(new Timeout(Span(2, Seconds))){
-          hookupClient.messages.exists(e => e.contains("disconnected")) mustBe true
-        }
+      actorRef ! TerminateMessage(channelId, None)
+      eventually(new Timeout(Span(2, Seconds))){
+        hookupClient.messages.exists(e => e.contains("disconnected")) mustBe true
       }
     }
   }
-
 }

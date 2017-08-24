@@ -23,10 +23,15 @@ import scala.util.{Success, Failure}
 import java.util.concurrent.TimeUnit
 import org.languagetool.JLanguageTool
 import org.languagetool.Language
+import akka.actor.ActorRef
+import io.github.qwefgh90.repogarden.web.actor.PubActor._
 
 @Singleton
-class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache") cache: AsyncCacheApi)(implicit executionContext: ExecutionContext) {
-  def build(typoRequest: TypoRequest): Future[Long] = {
+class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache") cache: AsyncCacheApi, @Named("pub-actor") pubActor: ActorRef)(implicit executionContext: ExecutionContext) {
+  /*
+   * Start to check spells and get id of a event.
+   */
+  def build(typoRequest: TypoRequest, delay: Duration = Duration.Zero): Future[Long] = {
     getRunningId(typoRequest.ownerId, typoRequest.repositoryId, typoRequest.branchName).flatMap(currentIdOpt => {
       if(currentIdOpt.isDefined){
         Future{
@@ -35,23 +40,48 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
       }else{
         val idFuture = getNewId(typoRequest)
         idFuture.map(parentId => {
-          val checkFuture = checkSpell(parentId, typoRequest)
-          checkFuture.flatMap{list => 
-            typoDao.insertTypos(list).flatMap{numOpt =>
-              typoDao.updateTypoStat(parentId, TypoStatus.FINISHED, "")
-            }
-          }.recover{
-            case t => {
-              typoDao.updateTypoStat(parentId, TypoStatus.FAILED, t.toString)
-              Logger.error("", t)
-            }
-          }
+
+          Future{blocking{Thread.sleep(delay.toMillis)}}.flatMap{unit =>
+            checkSpell(parentId, typoRequest).flatMap{list =>
+              typoDao.insertTypos(list).flatMap{numOpt =>
+                val updateFuture = typoDao.updateTypoStat(parentId, TypoStatus.FINISHED, "")
+                updateFuture.onSuccess{case num => 
+                  pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FINISHED.toString))
+                  pubActor ! TerminateMessage(parentId, None)
+                }
+                updateFuture.onFailure{case t =>
+                  pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FAILED.toString))
+                  pubActor ! TerminateMessage(parentId, None)
+                  Logger.error("", t)
+                }
+                updateFuture
+              }
+            }.recover{
+              case t => {
+                val updateFuture = typoDao.updateTypoStat(parentId, TypoStatus.FAILED, t.toString)
+                updateFuture.onSuccess{case num =>
+                  pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FAILED.toString))
+                  pubActor ! TerminateMessage(parentId, None)
+                  Logger.error("", t)
+                }
+                updateFuture.onFailure{case t =>
+                  pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FAILED.toString))
+                  pubActor ! TerminateMessage(parentId, None)
+                  Logger.error("", t)
+                }
+                updateFuture
+              }
+            }}
+
           parentId
         })
       }
     })
   }
 
+  /*
+   * Return a typo list, after checking spelling of nodes in treeEx.
+   */
   private def checkSpell(parentId: Long, typoRequest: TypoRequest): Future[List[Typo]]  = {
     val treeEx = typoRequest.treeEx
 	val langTool = new JLanguageTool(Language.AMERICAN_ENGLISH);
@@ -62,12 +92,26 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
         override def enter(node: TreeEntryEx, stack: List[TreeEntryEx]){
           val contentOpt = scala.util.Try(node.getContent).getOrElse(None)
           if(contentOpt.isDefined){
-            val matches = langTool.check(contentOpt.get)
-            val issueCount = matches.size()
-            val matchesToSave = matches.asScala.map(ruleMatch => {
-              TypoComponent(parentId, node.entry.getPath, ruleMatch.getFromPos, ruleMatch.getToPos, ruleMatch.getLine, ruleMatch.getColumn, ruleMatch.getSuggestedReplacements.asScala.toList)
-            })
-            val spellCheckResult = Json.toJson(matchesToSave).toString
+            import io.github.qwefgh90.repogarden.extractor._
+            val stream = new java.io.ByteArrayInputStream(contentOpt.get.getBytes("utf-8"))
+            val comment = Extractor.extractCommentsByStream(stream, node.name).getOrElse(List())
+            stream.close()
+
+            val matches = comment.map{result =>
+              val matches = langTool.check(result.comment)
+              val partialList = matches.asScala.filter{ruleMatch => ruleMatch.getSuggestedReplacements.size() > 0}.map(ruleMatch => {
+                val c = TypoComponent(parentId, node.entry.getPath, result.startOffset + ruleMatch.getFromPos, result.startOffset + ruleMatch.getToPos, ruleMatch.getLine, ruleMatch.getColumn, ruleMatch.getSuggestedReplacements.asScala.toList)
+
+                Logger.debug(s"(${node.name} | ${result.startOffset} | ${result.comment.length})")
+                Logger.debug(s"${result.comment.substring(c.from, c.to)} => ${c.suggestedList.toString}")
+                c
+              })
+              partialList.toList
+            }.foldRight(List[TypoComponent]())((e, z) => {e ++ z})
+
+
+            val issueCount = matches.length
+            val spellCheckResult = Json.toJson(matches).toString
             val highlight = ""
             val typo = Typo(parentId, node.entry.getPath, node.entry.getSha, issueCount, spellCheckResult, highlight)
             acc = typo :: acc
@@ -80,12 +124,18 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
     }
   }
 
+  /*
+   * Return a new id of a typostat.
+   */
   private def getNewId(typoRequest: TypoRequest): Future[Long] = {
     val startTime = System.currentTimeMillis
     val newRecord = TypoStat(None, typoRequest.ownerId, typoRequest.repositoryId, typoRequest.branchName, typoRequest.commitSha, Some(startTime), None, "", TypoStatus.PROGRESS.toString, typoRequest.userId)
     typoDao.insertTypoStat(newRecord)
   }
 
+  /*
+   * Return a running job's id.
+   */
   private def getRunningId(ownerId: Long, repositoryId: Long, branchName: String): Future[Option[Long]] = {
     typoDao.selectLastTypoStat(ownerId, repositoryId, branchName).map(typoStatOpt => {
       if(typoStatOpt.map(typoStat => TypoStatus.withName(typoStat.state) == TypoStatus.PROGRESS).getOrElse(false))

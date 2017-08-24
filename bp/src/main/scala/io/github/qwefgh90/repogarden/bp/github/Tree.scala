@@ -42,7 +42,7 @@ trait Tree2 {
     def getContent: Option[String] = {
       if(!sync)
         throw new IllegalAccessException("The content does not loaded. please call syncContent()")
-      if(encoding == Blob.ENCODING_UTF8){
+      if(encoding == Blob.ENCODING_UTF8 || encoding == Blob.ENCODING_BASE64){
         Option(content)
       }else{
         Option.empty

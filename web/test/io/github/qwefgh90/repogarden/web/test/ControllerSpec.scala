@@ -1,6 +1,5 @@
 package io.github.qwefgh90.repogarden.web.test
-import play.api.inject.ApplicationLifecycle
-import play.api.inject.BindingKey
+import play.api.inject.{ApplicationLifecycle, BindingKey, bind}
 import play.api.cache._
 import org.scalatestplus.play._
 import org.scalatestplus.play.guice._
@@ -37,13 +36,13 @@ import java.util.concurrent._
 
 class ControllerSpec extends PlaySpec with BeforeAndAfterAll {
 
-  val port = 15551
-
-  val app = new GuiceApplicationBuilder()
-    .configure("play.acceptOriginList" -> Seq("localhost:" + port))
+  lazy val app =
+    new GuiceApplicationBuilder()
+    .configure("akka.remote.netty.tcp.port" -> 2551)
+    .configure("akka.cluster.seed-nodes.0" -> "akka.tcp://ClusterSystem@127.0.0.1:2551")
 	.in(Mode.Test)
 	.build()
-
+  
   override def beforeAll() {
     // start up your web server or whatever
   }
@@ -89,7 +88,9 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {
       user.setName("name")
       user.setAvatarUrl("avatar")
       cache.sync.set(user.getId.toString, oauthToken)
-      val userInfo = homeController.userInfo.apply(FakeRequest().withSession("signed" -> "signed", "user" -> Json.toJson(user)(userWritesToSession).toString))
+      val fakeRequest = FakeRequest().withSession("signed" -> "signed", "user" -> Json.toJson(user)(userWritesToSession).toString)
+      val userInfo = homeController.userInfo.apply(fakeRequest)
+      Logger.debug("fakeRequest: " + fakeRequest.headers.toString)
       status(userInfo) mustBe OK
     }
 
@@ -127,6 +128,5 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {
       session(result).data("signed") mustBe "signed"
       Logger.debug(s"async result is ${result}")
     }
-
   }
 }
