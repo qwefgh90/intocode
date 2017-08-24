@@ -8,7 +8,7 @@ import scala.collection.JavaConverters._
 import io.github.qwefgh90.repogarden.web.model._
 
 class SpellCheckService {
-  val langTool = new JLanguageTool(Language.AMERICAN_ENGLISH);
+/*  val langTool = new JLanguageTool(Language.AMERICAN_ENGLISH);
   langTool.activateDefaultPatternRules();
 
   def check(sentence: String): SpellCheckResult = {
@@ -20,5 +20,5 @@ class SpellCheckService {
         matchesJava.asScala.toList
     
     SpellCheckResult(sentence, matches.map(res => TypoPosition(sentence.substring(res.getFromPos, res.getToPos), res.getFromPos, res.getToPos, res.getSuggestedReplacements().asScala.toList)))
-  }
+  }*/
 }

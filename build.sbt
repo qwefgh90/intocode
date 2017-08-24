@@ -21,7 +21,8 @@ lazy val extractor = (project in file("extractor")).dependsOn(bp).
     version := "0.1.0-SNAPSHOT",
     name := "extractor",
     libraryDependencies += "io.github.qwefgh90" % "jsearch" % "0.3.0" exclude("org.slf4j", "slf4j-log4j12"),
-    libraryDependencies += "org.languagetool" % "languagetool" % "2.0.1" exclude("org.slf4j", "slf4j-jdk14")
+    libraryDependencies += "org.languagetool" % "languagetool-core" % "3.8",
+    libraryDependencies += "org.languagetool" % "language-en" % "3.8" exclude("org.slf4j", "slf4j-jdk14")
   )
 
 lazy val web = (project in file("web")).enablePlugins(PlayScala).dependsOn(bp).dependsOn(extractor).
