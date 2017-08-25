@@ -98,6 +98,9 @@ object Extractor {
       case HTML_TYPE => {
         parseHtmlType(streamReader)
       }
+      case XML_TYPE => {
+        parseHtmlType(streamReader)
+      }
       case BAT_TYPE => {
         parseBatType(streamReader)
       }
@@ -105,9 +108,9 @@ object Extractor {
         parseShType(streamReader)
       }
       case _ => {
-        Option.empty
+        Some(List(CommentResult(0, streamToArray(streamReader))))
+//        Option.empty
       }
-
     }
   }
 }

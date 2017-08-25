@@ -26,6 +26,7 @@ import org.languagetool.language.AmericanEnglish
 import org.languagetool.Language
 import org.languagetool.rules._
 import org.languagetool._
+import org.languagetool.rules.spelling.SpellingCheckRule
 import akka.actor.ActorRef
 import io.github.qwefgh90.repogarden.web.actor.PubActor._
 
@@ -45,8 +46,8 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
         idFuture.map(parentId => {
 
           Future{blocking{Thread.sleep(delay.toMillis)}}.flatMap{unit =>
-            checkSpell(parentId, typoRequest).flatMap{list =>
-              typoDao.insertTypos(list).flatMap{numOpt =>
+            checkSpell(parentId, typoRequest).flatMap{list => 
+              typoDao.insertTypoAndDetailList(list).flatMap{numOpt =>
                 val updateFuture = typoDao.updateTypoStat(parentId, TypoStatus.FINISHED, "")
                 updateFuture.onSuccess{case num => 
                   pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FINISHED.toString))
@@ -85,14 +86,27 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
   /*
    * Return a typo list, after checking spelling of nodes in treeEx.
    */
-  private def checkSpell(parentId: Long, typoRequest: TypoRequest): Future[List[Typo]]  = {
+  private def checkSpell(parentId: Long, typoRequest: TypoRequest): Future[List[(Typo, List[TypoComponent])]]  = {
     val treeEx = typoRequest.treeEx
 	val langTool = new JLanguageTool(new AmericanEnglish());
-    langTool.disableCategory(new CategoryId("TYPOGRAPHY"))
+    langTool.getAllRules().asScala.foreach{rule =>
+      if (!rule.isDictionaryBasedSpellingRule()) {
+        langTool.disableRule(rule.getId());
+      }
+      if (rule.isInstanceOf[SpellingCheckRule]) {
+        val wordsToIgnore = List("@author");
+        (rule.asInstanceOf[SpellingCheckRule]).addIgnoreTokens(wordsToIgnore.asJava);
+      }
+    }
+    //    langTool.disableCategory(new CategoryId("TYPOGRAPHY"))
+    //    langTool.disableCategory(new CategoryId("CAPITALIZATION"))
+    //    langTool.disableCategory(new CategoryId("PUNCTUATION"))
+    //    langTool.disableRule("UPPERCASE_SENTENCE_START")
+    //    langTool.getAllActiveRules().asScala.foreach{r=> Logger.debug(s"rule: ${r.getId} | ${r.getCategory.getId}")}
 
     Future{
-      val visitor = new io.github.qwefgh90.repogarden.bp.github.Implicits.Visitor[TreeEntryEx, List[Typo]]{
-        override var acc: List[Typo] = List[Typo]()
+      val visitor = new io.github.qwefgh90.repogarden.bp.github.Implicits.Visitor[TreeEntryEx, List[(Typo, List[TypoComponent])]]{
+        override var acc: List[(Typo, List[TypoComponent])] = List[(Typo, List[TypoComponent])]()
         override def enter(node: TreeEntryEx, stack: List[TreeEntryEx]){
           val contentOpt = scala.util.Try(node.getContent).getOrElse(None)
           if(contentOpt.isDefined){
@@ -104,21 +118,20 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
             val matches = comment.map{result =>
               val matches = langTool.check(result.comment)
               val partialList = matches.asScala.filter{ruleMatch => ruleMatch.getSuggestedReplacements.size() > 0}.map(ruleMatch => {
-                val c = TypoComponent(parentId, node.entry.getPath, result.startOffset + ruleMatch.getFromPos, result.startOffset + ruleMatch.getToPos, ruleMatch.getLine, ruleMatch.getColumn, ruleMatch.getSuggestedReplacements.asScala.toList)
+                val c = TypoComponent(None, None, node.entry.getPath, result.startOffset + ruleMatch.getFromPos, result.startOffset + ruleMatch.getToPos, ruleMatch.getLine, ruleMatch.getColumn, Json.toJson(ruleMatch.getSuggestedReplacements.asScala.toList).toString)
 
-                Logger.debug(s"(${node.name} | ${result.startOffset} | ${c.from} | ${c.to} | ${result.comment.length})")
-                Logger.debug(s"${contentOpt.get.substring(c.from, c.to)} => ${c.suggestedList.toString}")
+               Logger.debug(s"(${node.name} | ${result.startOffset} | ${c.from} | ${c.to} | ${result.comment.length} | ${ruleMatch.getRule.getId.toString} | ${ruleMatch.getRule.getCategory.getId.toString})")
+               Logger.debug(s"${contentOpt.get.substring(c.from, c.to)} => ${c.suggestedList.toString}")
                 c
               })
               partialList.toList
             }.foldRight(List[TypoComponent]())((e, z) => {e ++ z})
 
-
             val issueCount = matches.length
-            val spellCheckResult = Json.toJson(matches).toString
+            val spellCheckResult = matches
             val highlight = ""
-            val typo = Typo(parentId, node.entry.getPath, node.entry.getSha, issueCount, spellCheckResult, highlight)
-            acc = typo :: acc
+            val typo = Typo(None, parentId, node.entry.getPath, node.entry.getSha, issueCount, highlight)
+            acc = (typo, matches) :: acc
             }
 
         }

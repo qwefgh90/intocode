@@ -4,7 +4,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import javax.inject.Inject
 
 import io.github.qwefgh90.repogarden.web.model.TypoStat
-import io.github.qwefgh90.repogarden.web.model.Typo
+import io.github.qwefgh90.repogarden.web.model.{Typo, TypoComponent}
 import io.github.qwefgh90.repogarden.web.model.TypoStatus._
 import play.api.db.slick.DatabaseConfigProvider
 import play.api.db.slick.HasDatabaseConfigProvider
@@ -42,12 +42,44 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
     db.run(typoStats.filter(_.id === id).map(tb => (tb.status, tb.message)).update((status.toString, message)))
   }
 
-  def insertTypo(typo: Typo): Future[Int] = {
-    db.run(typos += typo)
+  def insertTypo(typo: Typo): Future[Long] = {
+    db.run((typos returning typos.map(_.id)) += typo)
+  }
+
+  def insertTypoAction(typo: Typo) = {
+    (typos returning typos.map(_.id)) += typo
   }
 
   def insertTypos(typoList: Seq[Typo]): Future[Option[Int]] = {
     db.run(typos ++= typoList)
+  }
+
+  def insertTypoAndDetailList(typoList: Seq[(Typo, List[TypoComponent])]): Future[List[Long]] = {
+    typoList.foldLeft(Future{List[Long]()}){
+      (acc, tuple) => {
+        val typo = tuple._1
+        val components = tuple._2
+        acc.flatMap{ list =>
+          insertTypo(typo).flatMap{parentId =>
+            insertTypoComponents(parentId, components).map{num =>
+              parentId :: list
+            }
+          }
+        }
+      }
+    }
+  }
+
+  def insertTypoComponents(parentId: Long, list: List[TypoComponent]): Future[Option[Int]] = {
+    db.run(typoComponents ++= list.map{_.copy(parentId = Some(parentId))})
+  }
+
+  def insertTypoComponentsAction(parentId: Long, list: List[TypoComponent]) = {
+    typoComponents ++= list.map{_.copy(parentId = Some(parentId))}
+  }
+
+  def selectTypoComponentByParentId(parentId: Long): Future[Seq[TypoComponent]] = {
+    db.run(typoComponents.filter(_.parentId === parentId).result)
   }
 
   def selectTypoList(id: Long): Future[Seq[Typo]] = {
@@ -75,16 +107,33 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
   private val typoStats = TableQuery[TypoStatTable]
 
   private class TypoTable(tag: Tag) extends Table[Typo](tag, "TYPO"){
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def parentId = column[Long]("parent_id")
     def path = column[String]("path")
     def treeSha = column[String]("tree_sha")
     def issueCount = column[Int]("issue_count")
-    def components = column[String]("components")
     def highlight = column[String]("highlight")
     
     def typoStat = foreignKey("PARENT_ID_FK", parentId, typoStats)(_.id, onUpdate=ForeignKeyAction.Restrict, onDelete=ForeignKeyAction.Cascade)
 
-    def * = (parentId, path, treeSha, issueCount, components, highlight) <> (Typo.tupled, Typo.unapply)
+    def * = (id.?, parentId, path, treeSha, issueCount, highlight) <> (Typo.tupled, Typo.unapply)
   }
   private val typos = TableQuery[TypoTable]
+
+  private class TypoComponentTable(tag: Tag) extends Table[TypoComponent](tag, "TYPOCOMPONENT"){
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def parentId = column[Option[Long]]("parent_id")
+    def path = column[String]("path")
+    def from = column[Int]("from")
+    def to = column[Int]("to")
+    def endLine = column[Int]("end_line")
+    def columnNum = column[Int]("column_num")
+    def suggestedList = column[String]("suggested_list")
+    def disabled = column[Boolean]("disabled")
+
+    def typo = foreignKey("PARENT_ID_FK2", parentId, typos)(_.id, onUpdate=ForeignKeyAction.Restrict, onDelete=ForeignKeyAction.Cascade)
+
+    def * = (id.?, parentId, path, from, to, endLine, columnNum, suggestedList, disabled) <> (TypoComponent.tupled, TypoComponent.unapply)
+  }
+  private val typoComponents = TableQuery[TypoComponentTable]
 }

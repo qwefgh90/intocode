@@ -6,9 +6,9 @@ import io.github.qwefgh90.repogarden.web.service.GithubService
 
 case class TypoStat(id: Option[Long], ownerId: Long, repositoryId: Long, branchName: String, commitSha: String, startTime: Option[Long], completeTime: Option[Long], message: String, state: String, userId: Long)
 
-case class Typo(parentId: Long, path: String, treeSha: String, issueCount: Int, components: String, highlight: String)
+case class Typo(id: Option[Long], parentId: Long, path: String, treeSha: String, issueCount: Int, highlight: String)
 
-case class TypoComponent(parentId: Long, path: String, from: Int, to: Int, endLine: Int, column: Int, suggestedList: List[String])
+case class TypoComponent(id: Option[Long], parentId: Option[Long], path: String, from: Int, to: Int, endLine: Int, columnNum: Int, suggestedList: String, disabled: Boolean = false)
 
 
 object TypoRequest extends ((Long, Long, String, String, Long, TreeEx) => TypoRequest) {

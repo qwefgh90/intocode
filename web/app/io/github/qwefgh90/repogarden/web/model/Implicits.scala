@@ -127,15 +127,15 @@ object Implicits extends RepositoryExtension {
       (JsPath \ "suggestedList").format[List[String]]
   )(TypoPosition.apply, unlift(TypoPosition.unapply))
 
-  implicit val typoComponentFormat: Format[TypoComponent] = (
+/*  implicit val typoComponentFormat: Format[TypoComponent] = (
     (JsPath \ "parentId").format[Long] and
-    (JsPath \ "path").format[String] and
+    (JsPath \ "parentId").format[Long] and
+      (JsPath \ "path").format[String] and
       (JsPath \ "from").format[Int] and
       (JsPath \ "to").format[Int] and
       (JsPath \ "endLine").format[Int] and
       (JsPath \ "column").format[Int] and
-      (JsPath \ "suggestedList").format[List[String]]
   )(TypoComponent.apply, unlift(TypoComponent.unapply))
-
+ */
 
 }
