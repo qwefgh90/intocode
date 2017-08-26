@@ -15,7 +15,7 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
   import profile.api._
   
   def create(): Future[Any] = {
-    db.run(DBIOAction.seq(typoStats.schema.create, typos.schema.create))
+    db.run(DBIOAction.seq(typoStats.schema.create, typos.schema.create, typoComponents.schema.create))
   }
 
   def insertTypoStat(typoStat: TypoStat): Future[Long] = {
@@ -60,11 +60,10 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
         val typo = tuple._1
         val components = tuple._2
         acc.flatMap{ list =>
-          insertTypo(typo).flatMap{parentId =>
-            insertTypoComponents(parentId, components).map{num =>
-              parentId :: list
-            }
-          }
+          db.run(insertTypoAction(typo)
+            .flatMap{parentId => insertTypoComponentsAction(parentId, components).map{num => parentId :: list};}
+            .transactionally
+          )
         }
       }
     }
@@ -82,8 +81,8 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
     db.run(typoComponents.filter(_.parentId === parentId).result)
   }
 
-  def selectTypoList(id: Long): Future[Seq[Typo]] = {
-    db.run(typos.filter(_.parentId === id).result)
+  def selectTypoList(parentId: Long): Future[Seq[Typo]] = {
+    db.run(typos.filter(_.parentId === parentId).result)
   }
 
   def selectTypoList(ownerId: Long, repositoryId: Long, commitSha: String): Future[Seq[Typo]] = {

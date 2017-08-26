@@ -26,9 +26,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import akka.util._
 import org.eclipse.egit.github.core._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
-import io.github.qwefgh90.repogarden.web.model.Typo
-import io.github.qwefgh90.repogarden.web.model.TypoStat
-import io.github.qwefgh90.repogarden.web.model.TypoStatus
+import io.github.qwefgh90.repogarden.web.model.{Typo, TypoStat, TypoStatus, TypoComponent}
 import io.github.qwefgh90.repogarden.bp.Boilerplate._
 import java.util.concurrent._
 import scala.concurrent.Future
@@ -59,6 +57,7 @@ class TypoDaoSpec extends PlaySpec with GuiceOneAppPerSuite {
       val typo2 = Typo(None, idx, "src/main/scala/main.scala", "treeSha", 3, "text: hello")
       val insertResult1 = typoDao.insertTypo(typo1)
       val insertResult2 = typoDao.insertTypo(typo2)
+
       Await.ready(insertResult1.flatMap(result => insertResult2), Duration(10, TimeUnit.SECONDS))
       val tryValue = scala.util.Try(Await.result(typoDao.selectTypoStat(ownerId, repoId, commitSha), Duration(10, TimeUnit.SECONDS)))
       assert(tryValue.isSuccess)
@@ -66,6 +65,21 @@ class TypoDaoSpec extends PlaySpec with GuiceOneAppPerSuite {
       val tryList = scala.util.Try(Await.result(typoDao.selectTypoList(ownerId, repoId, commitSha), Duration(10, TimeUnit.SECONDS)))
       assert(tryList.isSuccess)
       assert(tryList.get.length == 2)
+
+      val typo3 = Typo(None, idx, "src/main/scala/main.scala", "treeSha", 3, "text: hello")
+      val typoComp1 = TypoComponent(None, None, "path1", 99, 999, 1, 20, "suggest1")
+      val typoComp2 = TypoComponent(None, None, "path2", 99, 999, 1, 20, "suggest2")
+
+      val insertList1 = typoDao.insertTypoAndDetailList(List((typo3, List(typoComp1, typoComp2))))
+      val idxList1 = Await.result(insertList1, Duration(10, TimeUnit.SECONDS))
+      assert(idxList1.length == 1)
+      val tryTyposList = scala.util.Try(Await.result(typoDao.selectTypoList(idx), Duration(10, TimeUnit.SECONDS)))
+      val tryTyposCompList = scala.util.Try(Await.result(typoDao.selectTypoComponentByParentId(idxList1(0)), Duration(10, TimeUnit.SECONDS)))
+      assert(tryTyposList.isSuccess)
+      assert(tryTyposList.get.length == 3)
+      assert(tryTyposCompList.isSuccess)
+      assert(tryTyposCompList.get.length == 2)
+      Logger.debug(tryTyposCompList.get.toString)
     }
   }
 }

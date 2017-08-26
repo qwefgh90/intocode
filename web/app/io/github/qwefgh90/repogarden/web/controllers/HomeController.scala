@@ -22,7 +22,6 @@ import akka.stream.Materializer
  * This controller creates an `Action` to handle HTTP requests to the
  * application's home page.
  */
-@Singleton
 class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider, switchDao: SwitchDao, @Named("pub-actor") pubActor: ActorRef, configuration: Configuration)(implicit ec: ExecutionContext, implicit val actorSystem: ActorSystem, materializer: Materializer) extends Controller with SameOriginCheck {
 
   /**
@@ -45,7 +44,6 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
           ClientActor.props(out, rh, channelIdOpt.get, userOpt.get)
         })
     }
-
   }
 
   /**
@@ -90,7 +88,6 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     })
   }
 
-
   def getBranches(owner: String, name: String) = (builder andThen builder.UserAction).async { implicit request =>
     val tokenFuture = cache.get[String](request.user.getId.toString)
     tokenFuture.map({ tokenOpt =>
@@ -126,6 +123,11 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
   }
 }
 
+class TypoController @Inject()(githubService: GithubService) extends Controller {
+  def build(owner: String, name: String, branchName: String) = Action { implicit request =>
+    Ok
+  }
+}
 
 trait SameOriginCheck {
 
