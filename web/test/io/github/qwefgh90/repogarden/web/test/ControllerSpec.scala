@@ -72,6 +72,16 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {
 	
 	require(oauthTokenOpt.isDefined)
 
+    val owner = "repogarden"
+    val name = "repogarden-test"
+    val mockAuthService = new MockAuthService(accessToken = oauthToken)(context)
+    val authController = new AuthController(mockAuthService, context, cache, githubProvider)
+    val fr = FakeRequest().withJsonBody(Json.parse("""{"code":"code", "state":"state", "clientId":"clientId"}"""))
+    val result = authController.accessToken.apply(fr)
+    status(result) mustBe OK
+    session(result).data("signed") mustBe "signed"
+    val user = session(result).data("user")
+
     "return unauthorized code to a unauthenticated user" in {
       val userInfoResponse = homeController.userInfo.apply(FakeRequest())
       status(userInfoResponse) mustBe UNAUTHORIZED
@@ -95,9 +105,6 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {
     }
 
     "return repositories" in {
-      val mockAuthService = new MockAuthService(accessToken = oauthToken)(context)
-      val authController = new AuthController(mockAuthService, context, cache, githubProvider)
-
       val fr = FakeRequest().withJsonBody(Json.parse("""{"code":"code", "state":"state", "clientId":"clientId"}"""))
       val result = authController.accessToken.apply(fr)
 
@@ -117,6 +124,22 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {
       })
     }
 
+    "return a branch list" in {
+      val requestForBranches = FakeRequest("GET", "").withSession("signed" -> "signed", "user" -> user)
+      val resultOfBranches = homeController.getBranches(owner, name)(requestForBranches)
+      status(resultOfBranches) mustBe OK
+      assert((contentAsJson(resultOfBranches) \\ "name").find(_.asInstanceOf[JsString].value == "master").isDefined)
+    }
+
+    "return a commit" in {
+      val sha = "569a599e7ff48c07a85ce323c53a6a8a2389f982"
+      val requestForCommit = FakeRequest("GET", "").withSession("signed" -> "signed", "user" -> user) 
+      val resultOfCommit = homeController.getCommit(owner, name, sha)(requestForCommit)
+      status(resultOfCommit) mustBe OK
+      assert((contentAsJson(resultOfCommit) \ "sha").as[String] == sha)
+
+    }
+
     "return session data to a user who is authenticated" in {
       val mockAuthService = new MockAuthService(accessToken = oauthToken)(context)
       val authController = new AuthController(mockAuthService, context, cache, githubProvider)
@@ -126,7 +149,6 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {
 
       status(result) mustBe OK
       session(result).data("signed") mustBe "signed"
-      Logger.debug(s"async result is ${result}")
     }
   }
 }

@@ -74,9 +74,9 @@ class TypoServiceSpec extends MockWebServer {//extends PlaySpec with GuiceOneApp
   "TypoService" should {
     "start finding typos and subscribe messages" in {
 
-      val req = TypoRequest.createLastRequest(githubService, "qwefgh90", "RepogardenTest", "master").get
+      val req = TypoRequest.createLastRequest(githubService, "repogarden", "repogarden-test", "master").get
       Logger.debug(req.toString)
-      val future = typoService.build(req, Duration(2, TimeUnit.SECONDS))
+      val future = typoService.buildLastCommit(req, Duration(2, TimeUnit.SECONDS))
       val id = Await.result(future, Duration(20, TimeUnit.SECONDS))
 
       val hookupClient = new DefaultHookupClient(HookupClientConfig(URI.create(s"ws://localhost:${port}/ws?ch=${id}"))) {

@@ -30,12 +30,11 @@ import org.languagetool.rules.spelling.SpellingCheckRule
 import akka.actor.ActorRef
 import io.github.qwefgh90.repogarden.web.actor.PubActor._
 
-@Singleton
 class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache") cache: AsyncCacheApi, @Named("pub-actor") pubActor: ActorRef)(implicit executionContext: ExecutionContext) {
   /*
-   * Start to check spells and get id of a event.
+   * Start to check spells in last commits of branch and get id of a event.
    */
-  def build(typoRequest: TypoRequest, delay: Duration = Duration.Zero): Future[Long] = {
+  def buildLastCommit(typoRequest: TypoRequest, delay: Duration = Duration.Zero): Future[Long] = {
     getRunningId(typoRequest.ownerId, typoRequest.repositoryId, typoRequest.branchName).flatMap(currentIdOpt => {
       if(currentIdOpt.isDefined){
         Future{
@@ -44,7 +43,6 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
       }else{
         val idFuture = getNewId(typoRequest)
         idFuture.map(parentId => {
-
           Future{blocking{Thread.sleep(delay.toMillis)}}.flatMap{unit =>
             checkSpell(parentId, typoRequest).flatMap{list => 
               typoDao.insertTypoAndDetailList(list).flatMap{numOpt =>
@@ -76,7 +74,6 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
                 updateFuture
               }
             }}
-
           parentId
         })
       }
@@ -115,17 +112,16 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
             val comment = Extractor.extractCommentsByStream(stream, node.name).getOrElse(List())
             stream.close()
 
-            val matches = comment.map{result =>
+            val matches: List[TypoComponent] = comment.map{result =>
               val matches = langTool.check(result.comment)
-              val partialList = matches.asScala.filter{ruleMatch => ruleMatch.getSuggestedReplacements.size() > 0}.map(ruleMatch => {
+              matches.asScala.filter{ruleMatch => ruleMatch.getSuggestedReplacements.size() > 0}.map(ruleMatch => {
                 val c = TypoComponent(None, None, node.entry.getPath, result.startOffset + ruleMatch.getFromPos, result.startOffset + ruleMatch.getToPos, ruleMatch.getLine, ruleMatch.getColumn, Json.toJson(ruleMatch.getSuggestedReplacements.asScala.toList).toString)
 
                Logger.debug(s"(${node.name} | ${result.startOffset} | ${c.from} | ${c.to} | ${result.comment.length} | ${ruleMatch.getRule.getId.toString} | ${ruleMatch.getRule.getCategory.getId.toString})")
                Logger.debug(s"${contentOpt.get.substring(c.from, c.to)} => ${c.suggestedList.toString}")
                 c
-              })
-              partialList.toList
-            }.foldRight(List[TypoComponent]())((e, z) => {e ++ z})
+              }).toList
+            }.foldRight(List[TypoComponent]())((e, acc) => {e ++ acc})
 
             val issueCount = matches.length
             val spellCheckResult = matches
@@ -133,7 +129,6 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
             val typo = Typo(None, parentId, node.entry.getPath, node.entry.getSha, issueCount, highlight)
             acc = (typo, matches) :: acc
             }
-
         }
         override def leave(node: TreeEntryEx){}
       }
@@ -155,7 +150,7 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
    */
   private def getRunningId(ownerId: Long, repositoryId: Long, branchName: String): Future[Option[Long]] = {
     typoDao.selectLastTypoStat(ownerId, repositoryId, branchName).map(typoStatOpt => {
-      if(typoStatOpt.map(typoStat => TypoStatus.withName(typoStat.state) == TypoStatus.PROGRESS).getOrElse(false))
+      if(typoStatOpt.map(typoStat => TypoStatus.withName(typoStat.status) == TypoStatus.PROGRESS).getOrElse(false))
         typoStatOpt.map(_.id.get)
       else
         None

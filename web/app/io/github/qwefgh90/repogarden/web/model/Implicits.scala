@@ -58,15 +58,16 @@ object Implicits extends RepositoryExtension {
 
   implicit val branchToBrowser = new Writes[org.eclipse.egit.github.core.RepositoryBranch] {
     def writes(branch: org.eclipse.egit.github.core.RepositoryBranch) = Json.obj(
-      "name" -> branch.getName
+      "name" -> branch.getName,
+      "commitSha" -> branch.getCommit.getSha
     )
   }
 
-  implicit val commitWritesToBrowser = new Writes[org.eclipse.egit.github.core.RepositoryCommit] {
+  implicit val commitWritesToBrowser = new OWrites[org.eclipse.egit.github.core.RepositoryCommit] {
     def writes(repoCommit: org.eclipse.egit.github.core.RepositoryCommit) = {
       val commit = repoCommit.getCommit
       Json.obj(
-        "sha" -> commit.getSha,
+        "sha" -> repoCommit.getSha,
         "message" -> commit.getMessage,
         "date" -> commit.getCommitter.getDate,
         "committerEmail" -> commit.getCommitter.getEmail,
@@ -76,6 +77,22 @@ object Implicits extends RepositoryExtension {
       )
     }
   }
+
+
+  implicit val typoStatsWritesToBrowser = new Writes[Tuple2[TypoStat, org.eclipse.egit.github.core.RepositoryCommit]] {
+    def writes(tuple: Tuple2[TypoStat, org.eclipse.egit.github.core.RepositoryCommit]) = {
+      val typoStat = tuple._1
+      val commit = tuple._2
+      (Json.toJsObject(commit)(commitWritesToBrowser)) ++ Json.obj(
+        "status" -> typoStat.status,
+        "startTime" -> typoStat.startTime,
+        "completetime" -> typoStat.completeTime,
+        "message" -> typoStat.message,
+        "id" -> typoStat.id
+      )
+    }
+  }
+
 
   implicit val treeEntryWritesToBrowser = new Writes[io.github.qwefgh90.repogarden.bp.github.Implicits.TreeEntryEx] {
     def writes(entry: io.github.qwefgh90.repogarden.bp.github.Implicits.TreeEntryEx) = {
@@ -127,15 +144,5 @@ object Implicits extends RepositoryExtension {
       (JsPath \ "suggestedList").format[List[String]]
   )(TypoPosition.apply, unlift(TypoPosition.unapply))
 
-/*  implicit val typoComponentFormat: Format[TypoComponent] = (
-    (JsPath \ "parentId").format[Long] and
-    (JsPath \ "parentId").format[Long] and
-      (JsPath \ "path").format[String] and
-      (JsPath \ "from").format[Int] and
-      (JsPath \ "to").format[Int] and
-      (JsPath \ "endLine").format[Int] and
-      (JsPath \ "column").format[Int] and
-  )(TypoComponent.apply, unlift(TypoComponent.unapply))
- */
 
 }

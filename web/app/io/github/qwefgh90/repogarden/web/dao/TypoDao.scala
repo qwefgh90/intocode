@@ -30,6 +30,10 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
     db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.commitSha === commitSha).result.headOption)
   }
 
+  def selectTypoStats(ownerId: Long, repositoryId: Long, userId: Long): Future[Seq[TypoStat]] = {
+    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.userId === userId).result)
+  }
+
   def selectLastTypoStat(ownerId: Long, repositoryId: Long, branchName: String): Future[Option[TypoStat]] = {
     db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.branchName === branchName).sortBy(_.startTime.desc.nullsFirst).take(1).result.headOption)
   }

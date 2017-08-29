@@ -4,7 +4,7 @@ package io.github.qwefgh90.repogarden.web.model
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
 import io.github.qwefgh90.repogarden.web.service.GithubService
 
-case class TypoStat(id: Option[Long], ownerId: Long, repositoryId: Long, branchName: String, commitSha: String, startTime: Option[Long], completeTime: Option[Long], message: String, state: String, userId: Long)
+case class TypoStat(id: Option[Long], ownerId: Long, repositoryId: Long, branchName: String, commitSha: String, startTime: Option[Long], completeTime: Option[Long], message: String, status: String, userId: Long)
 
 case class Typo(id: Option[Long], parentId: Long, path: String, treeSha: String, issueCount: Int, highlight: String)
 

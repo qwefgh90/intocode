@@ -34,27 +34,6 @@ import io.github.qwefgh90.repogarden.bp.Boilerplate._
 import play.api.Application
 import java.util.concurrent._
 
-trait MockWebServer extends PlaySpec with BeforeAndAfterAll {
-  val port = 15551
-  val app: Application =
-    new GuiceApplicationBuilder()
-      .configure("play.acceptOriginList" -> Seq("localhost:" + port))
-      .overrides(bind[UserSessionChecker].to[MockUserSessionChecker])
-	  .in(Mode.Test)
-	  .build()
-  val tserver = TestServer(port, app)
-
-  override def beforeAll() {
-    tserver.start()
-    // start up your web server or whatever
-  }
-
-  override def afterAll() {
-    tserver.stop()
-    app.stop() // shut down the web server
-  }
-}
-
 class WebsocketSpec extends MockWebServer {
   "Websocket controller" should {
     import io.github.qwefgh90.repogarden.web.actor.{PubActor, ClientActor}
