@@ -50,11 +50,14 @@ class GithubServiceSpec extends FlatSpec with Matchers with GuiceOneAppPerSuite 
     val repositories = githubService.getAllRepositories
     assert(repositories.length >= 0)
     if(repositories.length > 0 ){
+      githubService.getAllRepositories.foreach{repo =>
+        Logger.debug(s"repository in org:  ${repo.getOwner.getLogin}, ${repo.getOwner.getId}, ${repo.getOwner.getUrl}, ${repo.getName}")
+      }
       val repo = repositories(0)
       val branches = githubService.getBranches(repo)
       if(branches.length > 0){
         val branch = branches(0)
-        Logger.debug(s"repository:  ${repo.getOwner.getId}, ${repo.getOwner.getUrl}, ${repo.getName}, ${branch.getName}")
+        Logger.debug(s"repository:  ${repo.getOwner.getLogin}, ${repo.getOwner.getId}, ${repo.getOwner.getUrl}, ${repo.getName}, ${branch.getName}")
         val commitOpt = githubService.getCommit(repo, branch.getCommit.getSha)
         commitOpt.map { commit => {
           Logger.debug(s"commit: ${commit.getCommit.getMessage}, ${commit.getSha}")

@@ -10,6 +10,7 @@ import play.api.libs.functional.syntax._
 import play.api.mvc.Results._
 import org.eclipse.egit.github.core.{User}
 import io.github.qwefgh90.repogarden.web.model.Implicits._
+import io.github.qwefgh90.repogarden.web.service.{PermissionService}
 
 trait UserSessionChecker {
   def checkSign(rh: RequestHeader): Boolean
@@ -41,7 +42,7 @@ class DefualtUserSessionChecker @Inject()(cache: SyncCacheApi) extends UserSessi
       .get(user.getId.toString)
 }
 
-class ActionBuilder @Inject() (parser: play.api.mvc.BodyParsers.Default, val checker: UserSessionChecker)(implicit ec: ExecutionContext, cache: SyncCacheApi) extends ActionBuilderImpl(parser) {
+class ActionBuilder @Inject() (parser: play.api.mvc.BodyParsers.Default, val checker: UserSessionChecker)(implicit ec: ExecutionContext, cache: SyncCacheApi, permService: PermissionService) extends ActionBuilderImpl(parser) {
   override def invokeBlock[A](request: Request[A], block: (Request[A]) => Future[Result]) = {
     block(request)
   }
@@ -58,6 +59,58 @@ class ActionBuilder @Inject() (parser: play.api.mvc.BodyParsers.Default, val che
 
       Either.cond(signed && tokenOpt.isDefined,
         new UserRequest(userOpt.get, tokenOpt.get, req), Unauthorized)
+    }
+  }
+
+  def PermissionCheckAction(owner: String, name: String)(implicit ec: ExecutionContext) = new ActionFilter[UserRequest] {
+    def executionContext = ec
+    def filter[A](request: UserRequest[A]) = Future.successful {
+      implicit val req = request
+      if(permService.hasPermissionThisRepository(owner, name))
+        None
+      else
+        Some(Unauthorized)
+    }.recover{
+      case t => 
+        Logger.error("", t)
+        Some(InternalServerError)
+    }
+  }
+
+  def TypoStatPermissionCheckAction(typoStat: Long)(implicit ec: ExecutionContext) = new ActionFilter[UserRequest] {
+    def executionContext = ec
+    def filter[A](request: UserRequest[A]) = {
+      implicit val req = request
+      permService.hasPermissionThisTypoStatAsync(typoStat).map{possible => {
+        if(possible)
+          None
+        else
+          Some(Unauthorized)
+      }
+      }.recover{
+        case t =>
+          Logger.error("", t)
+          Some(InternalServerError)
+      }
+    }
+  }
+
+
+  def TypoCompPermissionCheckAction(typo: Long)(implicit ec: ExecutionContext) = new ActionFilter[UserRequest] {
+    def executionContext = ec
+    def filter[A](request: UserRequest[A]) = {
+      implicit val req = request
+      permService.hasPermissionThisTypoComponentAsync(typo).map{possible => {
+        if(possible)
+          None
+        else
+          Some(Unauthorized)
+      }
+      }.recover{
+        case t =>
+          Logger.error("", t)
+          Some(InternalServerError)
+      }
     }
   }
 }

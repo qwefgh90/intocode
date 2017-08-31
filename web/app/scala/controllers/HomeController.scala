@@ -19,14 +19,14 @@ import akka.actor._
 import akka.stream.Materializer
 
 /**
- * This controller creates an `Action` to handle HTTP requests to the
- * application's home page.
- */
+  * This controller creates an `Action` to handle HTTP requests to the
+  * application's home page.
+  */
 class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider, typoDao: TypoDao ,switchDao: SwitchDao, @Named("pub-actor") pubActor: ActorRef, configuration: Configuration)(implicit ec: ExecutionContext, implicit val actorSystem: ActorSystem, materializer: Materializer) extends Controller with SameOriginCheck {
 
   /**
-    * Verify and accept a request to subscribe a channel.
-    * 
+    * Verify and accept a request
+    * and then subscribe a channel.
     */
   def ws = WebSocket.acceptOrResult[JsValue, JsValue] { rh =>
     val channelIdOpt = rh.getQueryString("ch")
@@ -47,20 +47,26 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
   }
 
   /**
-   * Create an Action to render an HTML page.
-   *
-   * The configuration in the `routes` file means that this method
-   * will be called when the application receives a `GET` request with
-   * a path of `/`.
-   */
-//  def index = Action { implicit request =>
-    // Ok(io.github.qwefgh90.repogarden.web.views.html.index()).withNewSession
+    * Create an Action to render an HTML page.
+    *
+    * The configuration in the `routes` file means that this method
+    * will be called when the application receives a `GET` request with
+    * a path of `/`.
+    */
+  //  def index = Action { implicit request =>
+  // Ok(io.github.qwefgh90.repogarden.web.views.html.index()).withNewSession
   // }
 
+  /*
+   * Get my profile.
+   */
   def userInfo = (builder andThen builder.UserAction) { implicit request =>
     Ok(Json.toJson(request.user))
   }
 
+  /*
+   * Get my repositories.
+   */
   def getOnlyRepositories = (builder andThen builder.UserAction).async { implicit request =>
     val tokenFuture = cache.get[String](request.user.getId.toString)
     tokenFuture.map({ tokenOpt =>
@@ -68,7 +74,7 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
         val githubService = githubProvider.getInstance(tokenOpt.get)
         val result = Json.toJson(githubService.getAllRepositories.map(repository => {
           Json.toJson(repository) match {
-            case obj: JsObject => { 
+            case obj: JsObject => {
               val ynOpt = Await.result(switchDao.select(request.user.getId.toString, repository.getId.toString), 10 seconds).map(_.yn)
               
               obj + ("yn" -> JsBoolean(ynOpt.getOrElse(false)))
@@ -88,7 +94,10 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     })
   }
 
-  def getBranches(owner: String, name: String) = (builder andThen builder.UserAction).async { implicit request =>
+  /*
+   * Get a list of branches
+   */
+  def getBranches(owner: String, name: String) = (builder andThen builder.UserAction andThen builder.PermissionCheckAction(owner, name)).async { implicit request =>
     val tokenFuture = cache.get[String](request.user.getId.toString)
     tokenFuture.map({ tokenOpt =>
       if(tokenOpt.isDefined){
@@ -102,8 +111,10 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     })
   }
 
-
-  def getCommit(owner: String, name: String, sha: String) = (builder andThen builder.UserAction) { implicit request =>
+  /*
+   * Get a commit by sha.
+   */
+  def getCommit(owner: String, name: String, sha: String) = (builder andThen builder.UserAction andThen builder.PermissionCheckAction(owner, name)) { implicit request =>
     val token = request.token
     val githubService = githubProvider.getInstance(token)
     val repoOpt = githubService.getRepository(owner, name)
@@ -111,9 +122,14 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
       val commitOpt = githubService.getCommit(repo, sha)
       commitOpt.map(commit => Ok(Json.toJson(commit)(commitWritesToBrowser))).getOrElse({BadRequest("a requested commit does not exists.")})
     }).getOrElse(BadRequest("a requested commit not exists."))
+
   }
 
-  def getTreeByCommitSha(owner: String, name: String, commitSha: String) = (builder andThen builder.UserAction) { implicit request =>
+  /*
+   * Get a tree by commit sha.
+   * The tree doesn't contain contents.
+   */
+  def getTreeByCommitSha(owner: String, name: String, commitSha: String) = (builder andThen builder.UserAction andThen builder.PermissionCheckAction(owner, name)) { implicit request =>
     val token = request.token
     val githubService = githubProvider.getInstance(token)
     val repoOpt = githubService.getRepository(owner, name)
@@ -122,17 +138,19 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
       treeOpt.map(tree => Ok(Json.toJson(tree)(treeExWritesToBrowser))).getOrElse(BadRequest("a requested tree does not exists"))
     }).getOrElse(BadRequest("a requested tree does not exists"))
   }
+
+
 }
 
 trait SameOriginCheck {
 
   /**
-   * Checks that the WebSocket comes from the same origin.  This is necessary to protect
-   * against Cross-Site WebSocket Hijacking as WebSocket does not implement Same Origin Policy.
-   *
-   * See https://tools.ietf.org/html/rfc6455#section-1.3 and
-   * http://blog.dewhurstsecurity.com/2013/08/30/security-testing-html5-websockets.html
-   */
+    * Checks that the WebSocket comes from the same origin.  This is necessary to protect
+    * against Cross-Site WebSocket Hijacking as WebSocket does not implement Same Origin Policy.
+    *
+    * See https://tools.ietf.org/html/rfc6455#section-1.3 and
+    * http://blog.dewhurstsecurity.com/2013/08/30/security-testing-html5-websockets.html
+    */
   def sameOriginCheck(rh: RequestHeader, configuration: Configuration): Boolean = {
     rh.headers.get("Origin") match {
       case Some(originValue) if originMatches(originValue, configuration) =>

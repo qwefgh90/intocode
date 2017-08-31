@@ -30,8 +30,8 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
     db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.commitSha === commitSha).result.headOption)
   }
 
-  def selectTypoStats(ownerId: Long, repositoryId: Long, userId: Long): Future[Seq[TypoStat]] = {
-    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.userId === userId).sortBy(_.startTime.desc.nullsLast).result)
+  def selectTypoStats(ownerId: Long, repositoryId: Long, branchName: String, userId: Long): Future[Seq[TypoStat]] = {
+    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.branchName === branchName && stat.userId === userId).sortBy(_.startTime.desc.nullsLast).result)
   }
 
   def selectLastTypoStat(ownerId: Long, repositoryId: Long, branchName: String, userId: Long): Future[Option[TypoStat]] = {
@@ -73,6 +73,10 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
     }
   }
 
+  def selectTypo(id: Long): Future[Option[Typo]] = {
+    db.run(typos.filter(_.id === id).result.headOption)
+  }
+
   def selectTypos(parentId: Long): Future[Seq[Typo]] = {
     db.run(typos.filter(_.parentId === parentId).result)
   }
@@ -96,6 +100,10 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
 
   def selectTypoComponents(parentId: Long): Future[Seq[TypoComponent]] = {
     db.run(typoComponents.filter(_.parentId === parentId).result)
+  }
+
+  def selectTypoComponent(id: Long): Future[Option[TypoComponent]] = {
+    db.run(typoComponents.filter(_.id === id).result.headOption)
   }
 
   def updateDisabledToTypoComponent(id: Long, disabled: Boolean): Future[Int] = {

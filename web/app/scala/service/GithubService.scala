@@ -47,13 +47,16 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
   private lazy val dataService = {
 	new DataService(client);
   }
+  private lazy val orgService = {
+    new OrganizationService(client)
+  }
   def getUser = {
     userService.getUser
   }
   
   object KeyType extends Enumeration{
     type KeyType = Value
-    val getAllRepositories, getBranches, getCommits, getCommit, getRepository = Value
+    val getAllRepositories, getBranches, getCommits, getCommit, getRepository, getAllRepositoriesInOrgs = Value
     def getKey(key: String, t: KeyType, params: List[String] = List()) =
       s"${key}:${t.toString}:${params.mkString(":")}"
   }
@@ -66,8 +69,22 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     }
   }
 
+  def getOrganizations(implicit invalidate: Boolean = false): List[User] = {
+    orgService.getOrganizations.asScala.toList
+  }
+
+/*  def getAllRepositoriesInOrgs(implicit invalidate: Boolean = false): List[Repository] = {
+    cached(KeyType.getKey(accessToken, KeyType.getAllRepositories), {
+      val orgs = orgService.getOrganizations().asScala.toList
+      orgs.foldLeft(List[Repository]()){(acc, org) => 
+        acc ++ repoService.getOrgRepositories(org.getLogin).asScala.toList
+      }
+    })
+  }*/
+
   def getAllRepositories(implicit invalidate: Boolean = false): List[Repository] = {
-    cached(KeyType.getKey(accessToken, KeyType.getAllRepositories) ,{
+    cached(KeyType.getKey(accessToken, KeyType.getAllRepositories), {
+
       val repositoriesJava = repoService.getRepositories
       if(repositoriesJava == null)
         List()

@@ -25,7 +25,10 @@ import java.util.concurrent.TimeUnit
   */
 class TypoController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider, typoService: TypoService, typoDao: TypoDao, switchDao: SwitchDao, @Named("pub-actor") pubActor: ActorRef, configuration: Configuration)(implicit ec: ExecutionContext, implicit val actorSystem: ActorSystem, materializer: Materializer) extends Controller with SameOriginCheck {
 
-  def buildLastCommit(owner: String, name: String, branchName: String) = (builder andThen builder.UserAction).async {request =>
+  /*
+   * Find typo in a last commit.
+   */
+  def buildLastCommit(owner: String, name: String, branchName: String) = (builder andThen builder.UserAction andThen builder.PermissionCheckAction(owner, name)).async {request =>
     val githubService = githubProvider.getInstance(request.token)
     val reqOpt = TypoRequest.createLastRequest(githubService, owner, name, branchName)
     reqOpt.map{req =>
@@ -39,15 +42,17 @@ class TypoController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     }
   }
 
-
-  def getTypoStats(owner: String, name: String) = (builder andThen builder.UserAction).async { implicit request =>
+  /*
+   * Get a list of typostats in the branch.
+   */
+  def getTypoStats(owner: String, name: String, branchName: String) = (builder andThen builder.UserAction andThen builder.PermissionCheckAction(owner, name)).async { implicit request =>
     //need validate!!
 
     val githubService = githubProvider.getInstance(request.token)
     val repositoryOpt = githubService.getRepository(owner, name)
 
     repositoryOpt.map{repository =>
-      val futureToSend = typoDao.selectTypoStats(repository.getOwner.getId, repository.getId, request.user.getId).map{
+      val futureToSend = typoDao.selectTypoStats(repository.getOwner.getId, repository.getId, branchName, request.user.getId).map{
         _.map{typoStat =>
           val sha = typoStat.commitSha
           val commitOpt = githubService.getCommit(repository, sha)
@@ -63,7 +68,10 @@ class TypoController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     }.getOrElse(Future{BadRequest("invalid parameters")})
   }
 
-  def getTypos(typoStatId: Long) = (builder andThen builder.UserAction).async { implicit request =>
+  /*
+   * Get positions of typo and suggested word list.
+   */
+  def getTypos(typoStatId: Long) = (builder andThen builder.UserAction andThen builder.TypoStatPermissionCheckAction(typoStatId)).async { implicit request =>
     // need validate!!
 
     typoDao.selectTypos(typoStatId).flatMap{ typos =>
@@ -76,17 +84,20 @@ class TypoController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     }.recover{
       case t =>
         Logger.error("",t)
-        ServiceUnavailable
+        InternalServerError
     }
   }
 
-  def disableTypoComponent(typoComponentId: Long, disabled: Boolean) = (builder andThen builder.UserAction).async { implicit request =>
+  /*
+   * Put up a disable flag of a component.
+   */
+  def disableTypoComponent(typoComponentId: Long, disabled: Boolean) = (builder andThen builder.UserAction andThen builder.TypoCompPermissionCheckAction(typoComponentId)).async { implicit request =>
     typoDao.updateDisabledToTypoComponent(typoComponentId, disabled).map{count => 
         Ok
     }.recover{
       case t =>
         Logger.error("",t)
-        ServiceUnavailable
+        InternalServerError
     }
   }
 }

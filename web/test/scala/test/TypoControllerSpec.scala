@@ -106,7 +106,7 @@ class TypoControllerSpec extends PlaySpec with BeforeAndAfterAll {
     }
 
     "return a commit and typo list after finding typos" in {
-      val commitsResultBefore = typoController.getTypoStats(owner, name)(authFr)
+      val commitsResultBefore = typoController.getTypoStats(owner, name, branchName)(authFr)
       val arr = contentAsJson(commitsResultBefore).as[JsArray]
 
       status(commitsResultBefore) mustBe OK
@@ -114,7 +114,7 @@ class TypoControllerSpec extends PlaySpec with BeforeAndAfterAll {
 
       val id1 = blockingToFindTypo()
       val id2 = blockingToFindTypo()
-      val commitsResult = typoController.getTypoStats(owner, name)(authFr)
+      val commitsResult = typoController.getTypoStats(owner, name, branchName)(authFr)
       val commitsJson = contentAsJson(commitsResult)
 
       status(commitsResult) mustBe OK
