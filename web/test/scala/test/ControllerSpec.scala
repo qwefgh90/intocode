@@ -137,7 +137,14 @@ class ControllerSpec extends PlaySpec with BeforeAndAfterAll {
       val resultOfCommit = homeController.getCommit(owner, name, sha)(requestForCommit)
       status(resultOfCommit) mustBe OK
       assert((contentAsJson(resultOfCommit) \ "sha").as[String] == sha)
+    }
 
+    "return a tree" in {
+      val sha = "569a599e7ff48c07a85ce323c53a6a8a2389f982"
+      val requestForCommit = FakeRequest("GET", "").withSession("signed" -> "signed", "user" -> user) 
+      val resultOfTree = homeController.getTreeByCommitSha(owner, name, sha)(requestForCommit)
+      status(resultOfTree) mustBe OK
+      Logger.debug(contentAsJson(resultOfTree).toString)
     }
 
     "return session data to a user who is authenticated" in {

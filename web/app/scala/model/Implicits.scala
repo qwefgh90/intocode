@@ -1,5 +1,6 @@
 package io.github.qwefgh90.repogarden.web.model
 import play.api.libs.json._
+import play.api.libs.json.Writes._
 import play.api.libs.functional.syntax._
 import org.eclipse.egit.github.core._
 
@@ -102,7 +103,8 @@ object Implicits extends RepositoryExtension {
         "name" -> entry.name,
         "path" -> entry.entry.getPath,
         "sha" -> entry.entry.getSha,
-        "url" -> entry.entry.getUrl
+        "url" -> entry.entry.getUrl,
+        "type" -> entry.entry.getType
       )
     }
   }
@@ -131,6 +133,34 @@ object Implicits extends RepositoryExtension {
     )
   }
 
+  implicit val typoToBrowser = new OWrites[Typo] {
+    def writes(typo: Typo) = {
+      Json.obj(
+        "id" -> typo.id,
+        "path" -> typo.path
+      )
+    }
+  }
+
+  implicit val typoComponentToBrowser = new OWrites[TypoComponent] {
+    def writes(comp: TypoComponent) = {
+      Json.obj(
+        "id" -> comp.id,
+        "from" -> comp.from,
+        "to" -> comp.to,
+        "suggestedList" -> Json.parse(comp.suggestedList),
+        "disabled" -> comp.disabled
+      )
+    }
+  }
+
+  implicit val typoAndComponentsToBrowser = new Writes[Tuple2[Typo, Seq[TypoComponent]]] {
+    def writes(tuple: Tuple2[Typo, Seq[TypoComponent]]) = {
+      val typo = tuple._1
+      val components = tuple._2
+      Json.toJsObject(typo)(typoToBrowser) ++ Json.obj("list" -> Json.toJson(components)(seq(typoComponentToBrowser)))
+    }
+  }
   //SpellCheck
   implicit val spellCheckResultFormat: Format[SpellCheckResult] = (
     (JsPath \ "sentence").format[String] and

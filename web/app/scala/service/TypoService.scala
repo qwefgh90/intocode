@@ -32,10 +32,10 @@ import io.github.qwefgh90.repogarden.web.actor.PubActor._
 
 class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache") cache: AsyncCacheApi, @Named("pub-actor") pubActor: ActorRef)(implicit executionContext: ExecutionContext) {
   /*
-   * Start to check spells in last commits of branch and get id of a event.
+   * Start to check spells and get id for a event.
    */
-  def buildLastCommit(typoRequest: TypoRequest, delay: Duration = Duration.Zero): Future[Long] = {
-    getRunningId(typoRequest.ownerId, typoRequest.repositoryId, typoRequest.branchName).flatMap(currentIdOpt => {
+  def build(typoRequest: TypoRequest, delay: Duration = Duration.Zero): Future[Long] = {
+    getRunningId(typoRequest).flatMap(currentIdOpt => {
       if(currentIdOpt.isDefined){
         Future{
           currentIdOpt.get
@@ -46,7 +46,7 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
           Future{blocking{Thread.sleep(delay.toMillis)}}.flatMap{unit =>
             checkSpell(parentId, typoRequest).flatMap{list => 
               typoDao.insertTypoAndDetailList(list).flatMap{numOpt =>
-                val updateFuture = typoDao.updateTypoStat(parentId, TypoStatus.FINISHED, "")
+                val updateFuture = typoDao.updateTypoStat(parentId, TypoStatus.FINISHED, "", Some(System.currentTimeMillis))
                 updateFuture.onSuccess{case num => 
                   pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FINISHED.toString))
                   pubActor ! TerminateMessage(parentId, None)
@@ -60,7 +60,7 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
               }
             }.recover{
               case t => {
-                val updateFuture = typoDao.updateTypoStat(parentId, TypoStatus.FAILED, t.toString)
+                val updateFuture = typoDao.updateTypoStat(parentId, TypoStatus.FAILED, t.toString, Some(System.currentTimeMillis))
                 updateFuture.onSuccess{case num =>
                   pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FAILED.toString))
                   pubActor ! TerminateMessage(parentId, None)
@@ -117,7 +117,7 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
               matches.asScala.filter{ruleMatch => ruleMatch.getSuggestedReplacements.size() > 0}.map(ruleMatch => {
                 val c = TypoComponent(None, None, node.entry.getPath, result.startOffset + ruleMatch.getFromPos, result.startOffset + ruleMatch.getToPos, ruleMatch.getLine, ruleMatch.getColumn, Json.toJson(ruleMatch.getSuggestedReplacements.asScala.toList).toString)
 
-               Logger.debug(s"(${node.name} | ${result.startOffset} | ${c.from} | ${c.to} | ${result.comment.length} | ${ruleMatch.getRule.getId.toString} | ${ruleMatch.getRule.getCategory.getId.toString})")
+               Logger.debug(s"(${node.name} | ${result.startOffset} | ${c.from} | ${c.to} | ${result.comment.length} | ${ruleMatch.getRule.getId.toString} | ${ruleMatch.getRule.getCategory.getId.toString} | ${node.entry.getSha})")
                Logger.debug(s"${contentOpt.get.substring(c.from, c.to)} => ${c.suggestedList.toString}")
                 c
               }).toList
@@ -137,7 +137,7 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
   }
 
   /*
-   * Return a new id of a typostat.
+   * Return a id of a new typostat.
    */
   private def getNewId(typoRequest: TypoRequest): Future[Long] = {
     val startTime = System.currentTimeMillis
@@ -146,15 +146,14 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
   }
 
   /*
-   * Return a running job's id.
+   * Return a running job's id whose status is progress.
    */
-  private def getRunningId(ownerId: Long, repositoryId: Long, branchName: String): Future[Option[Long]] = {
-    typoDao.selectLastTypoStat(ownerId, repositoryId, branchName).map(typoStatOpt => {
+  private def getRunningId(typoRequest: TypoRequest): Future[Option[Long]] = {
+    typoDao.selectLastTypoStat(typoRequest.ownerId, typoRequest.repositoryId, typoRequest.branchName, typoRequest.userId).map(typoStatOpt => {
       if(typoStatOpt.map(typoStat => TypoStatus.withName(typoStat.status) == TypoStatus.PROGRESS).getOrElse(false))
         typoStatOpt.map(_.id.get)
       else
         None
     })
   }
-
 }

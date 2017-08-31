@@ -38,7 +38,7 @@ import play.api.Application
 import io.github.qwefgh90.repogarden.web.service.GithubServiceProvider
 import io.github.qwefgh90.repogarden.web.service.TypoService
 
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.concurrent.PatienceConfiguration.{Timeout, Interval}
 import org.scalatest.time.{Span, Seconds}
 import org.scalatest.concurrent.{Eventually}
 import org.scalatest.concurrent.Eventually._
@@ -76,7 +76,7 @@ class TypoServiceSpec extends MockWebServer {//extends PlaySpec with GuiceOneApp
 
       val req = TypoRequest.createLastRequest(githubService, "repogarden", "repogarden-test", "master").get
       Logger.debug(req.toString)
-      val future = typoService.buildLastCommit(req, Duration(2, TimeUnit.SECONDS))
+      val future = typoService.build(req, Duration(2, TimeUnit.SECONDS))
       val id = Await.result(future, Duration(20, TimeUnit.SECONDS))
 
       val hookupClient = new DefaultHookupClient(HookupClientConfig(URI.create(s"ws://localhost:${port}/ws?ch=${id}"))) {
@@ -106,11 +106,15 @@ class TypoServiceSpec extends MockWebServer {//extends PlaySpec with GuiceOneApp
         }
       }
 
-      eventually(new Timeout(Span(20, Seconds))){
+      eventually(new Timeout(Span(60, Seconds))){
         hookupClient.messages.exists(e => e.contains("FINISHED")) mustBe true
       }
 
-      val typoList = Await.result(typoDao.selectTypoList(id), Duration(10, TimeUnit.SECONDS))
+      eventually(new Timeout(Span(6, Seconds)), new Interval(Span(60, Seconds))){
+
+      }
+
+      val typoList = Await.result(typoDao.selectTypos(id), Duration(10, TimeUnit.SECONDS))
       assert(typoList.length > 1)
     }
   }

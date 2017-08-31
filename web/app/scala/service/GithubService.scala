@@ -137,6 +137,13 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     })
   }
 
+  def getTreeByCommitSha(repository: Repository, commitSha: String)(implicit sync: Boolean = false): Option[TreeEx] = {
+    getCommit(repository, commitSha).flatMap{repoCommit => 
+      val treeSha = repoCommit.getCommit.getTree.getSha
+      getTree(repository, treeSha)
+    }
+  }
+
   def getTree(repository: Repository, sha: String)(implicit sync: Boolean = false): Option[TreeEx] = {
     val tree = this.dataService.getTree(repository, sha, true)
     val treeOpt = if(tree == null) None else Some(tree)

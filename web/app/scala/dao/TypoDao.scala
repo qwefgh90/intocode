@@ -31,19 +31,19 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
   }
 
   def selectTypoStats(ownerId: Long, repositoryId: Long, userId: Long): Future[Seq[TypoStat]] = {
-    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.userId === userId).result)
+    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.userId === userId).sortBy(_.startTime.desc.nullsLast).result)
   }
 
-  def selectLastTypoStat(ownerId: Long, repositoryId: Long, branchName: String): Future[Option[TypoStat]] = {
-    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.branchName === branchName).sortBy(_.startTime.desc.nullsFirst).take(1).result.headOption)
+  def selectLastTypoStat(ownerId: Long, repositoryId: Long, branchName: String, userId: Long): Future[Option[TypoStat]] = {
+    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.branchName === branchName && stat.userId === userId).sortBy(_.startTime.desc.nullsFirst).take(1).result.headOption)
   }
 
   def deleteTypoStat(id: Long): Future[Int] = {
     db.run(typoStats.filter(_.id === id).delete)
   }
 
-  def updateTypoStat(id: Long, status: TypoStatus, message: String): Future[Int] = {
-    db.run(typoStats.filter(_.id === id).map(tb => (tb.status, tb.message)).update((status.toString, message)))
+  def updateTypoStat(id: Long, status: TypoStatus, message: String, completeTime: Option[Long] = None): Future[Int] = {
+    db.run(typoStats.filter(_.id === id).map(tb => (tb.status, tb.message, tb.completeTime)).update((status.toString, message, completeTime)))
   }
 
   def insertTypo(typo: Typo): Future[Long] = {
@@ -65,12 +65,21 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
         val components = tuple._2
         acc.flatMap{ list =>
           db.run(insertTypoAction(typo)
-            .flatMap{parentId => insertTypoComponentsAction(parentId, components).map{num => parentId :: list};}
+            .flatMap{parentId => insertTypoComponentsAction(parentId, components).map{num => parentId :: list}}
             .transactionally
           )
         }
       }
     }
+  }
+
+  def selectTypos(parentId: Long): Future[Seq[Typo]] = {
+    db.run(typos.filter(_.parentId === parentId).result)
+  }
+
+  def selectTypos(ownerId: Long, repositoryId: Long, commitSha: String): Future[Seq[Typo]] = {
+    this.selectTypoStat(ownerId, repositoryId, commitSha).map(stat => stat.get.id.get).flatMap(
+      id => this.selectTypos(id))
   }
 
   def insertTypoComponents(parentId: Long, list: List[TypoComponent]): Future[Option[Int]] = {
@@ -85,13 +94,12 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
     db.run(typoComponents.filter(_.parentId === parentId).result)
   }
 
-  def selectTypoList(parentId: Long): Future[Seq[Typo]] = {
-    db.run(typos.filter(_.parentId === parentId).result)
+  def selectTypoComponents(parentId: Long): Future[Seq[TypoComponent]] = {
+    db.run(typoComponents.filter(_.parentId === parentId).result)
   }
 
-  def selectTypoList(ownerId: Long, repositoryId: Long, commitSha: String): Future[Seq[Typo]] = {
-    this.selectTypoStat(ownerId, repositoryId, commitSha).map(stat => stat.get.id.get).flatMap(
-      id => this.selectTypoList(id))
+  def updateDisabledToTypoComponent(id: Long, disabled: Boolean): Future[Int] = {
+    db.run(typoComponents.filter(_.id === id).map(comp => (comp.disabled)).update((disabled)))
   }
 
   private class TypoStatTable(tag: Tag) extends Table[TypoStat](tag, "TYPOSTAT") {

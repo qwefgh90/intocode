@@ -53,9 +53,9 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
    * will be called when the application receives a `GET` request with
    * a path of `/`.
    */
-  def index = Action { implicit request =>
-    Ok(io.github.qwefgh90.repogarden.web.views.html.index()).withNewSession
-  }
+//  def index = Action { implicit request =>
+    // Ok(io.github.qwefgh90.repogarden.web.views.html.index()).withNewSession
+  // }
 
   def userInfo = (builder andThen builder.UserAction) { implicit request =>
     Ok(Json.toJson(request.user))
@@ -102,28 +102,6 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     })
   }
 
-  def getCommits(owner: String, name: String) = (builder andThen builder.UserAction).async { implicit request =>
-    //need validate!!
-
-    val githubService = githubProvider.getInstance(request.token)
-    val repositoryOpt = githubService.getRepository(owner, name)
-
-    repositoryOpt.map{repository =>
-      val futureToSend = typoDao.selectTypoStats(repository.getOwner.getId, repository.getId, request.user.getId).map{
-        _.map{typoStat =>
-          val sha = typoStat.commitSha
-          val commitOpt = githubService.getCommit(repository, sha)
-          commitOpt.map{(typoStat, _)}
-        }.collect{case v if v.isDefined => Json.toJson(v.get)(typoStatsWritesToBrowser)}
-      }
-      futureToSend.map{list => Ok(Json.toJson(list))}.recover{
-        case e: Exception => {
-          Logger.error("", e)
-          InternalServerError("error occurs. we would handle this issue soon.")
-        }
-      }
-    }.getOrElse(Future{BadRequest("invalid parameters")})
-  }
 
   def getCommit(owner: String, name: String, sha: String) = (builder andThen builder.UserAction) { implicit request =>
     val token = request.token
@@ -135,12 +113,12 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     }).getOrElse(BadRequest("a requested commit not exists."))
   }
 
-  def getTree(owner: String, name: String, sha: String) = (builder andThen builder.UserAction) { implicit request =>
+  def getTreeByCommitSha(owner: String, name: String, commitSha: String) = (builder andThen builder.UserAction) { implicit request =>
     val token = request.token
     val githubService = githubProvider.getInstance(token)
     val repoOpt = githubService.getRepository(owner, name)
     repoOpt.map(repo => {
-      val treeOpt = githubService.getTree(repo, sha)
+      val treeOpt = githubService.getTreeByCommitSha(repo, commitSha)
       treeOpt.map(tree => Ok(Json.toJson(tree)(treeExWritesToBrowser))).getOrElse(BadRequest("a requested tree does not exists"))
     }).getOrElse(BadRequest("a requested tree does not exists"))
   }
