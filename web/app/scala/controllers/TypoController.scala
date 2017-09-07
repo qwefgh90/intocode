@@ -1,6 +1,7 @@
 package io.github.qwefgh90.repogarden.web.controllers
 
 import play.api.cache._
+import java.io.IOException
 import javax.inject._
 import play.api._
 import play.api.mvc._
@@ -71,14 +72,21 @@ class TypoController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
   /*
    * Get positions of typo and suggested word list.
    */
-  def getTypos(typoStatId: Long) = (builder andThen builder.UserAction andThen builder.TypoStatPermissionCheckAction(typoStatId)).async { implicit request =>
+  def getTypos(owner: String, name: String, typoStatId: Long) = (builder andThen builder.UserAction andThen builder.TypoStatPermissionCheckAction(typoStatId)).async { implicit request =>
     // need validate!!
+
+    val githubService = githubProvider.getInstance(request.token)
+    val repositoryOpt = githubService.getRepository(owner, name)
 
     typoDao.selectTypos(typoStatId).flatMap{ typos =>
       Future.sequence(typos.map{typo =>
-        typoDao.selectTypoComponents(typo.id.get).map{ components =>
-          (typo, components)
-        }
+        repositoryOpt.flatMap{repository => 
+          githubService.getContentByTreeSha(repository, typo.treeSha).map{body =>
+            typoDao.selectTypoComponents(typo.id.get).map{ components =>
+              (typo, components, body)
+            }
+          }
+        }.getOrElse(Future.failed(new IOException(s"the repository(${owner}, ${name}) does not exist.")))
       })
     }.map{tupleList => Ok(Json.toJson(tupleList)(seq(typoAndComponentsToBrowser)))
     }.recover{

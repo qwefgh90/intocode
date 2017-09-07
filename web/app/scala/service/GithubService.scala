@@ -17,6 +17,7 @@ import scala.concurrent.duration._
 import java.util.concurrent._
 import io.github.qwefgh90.repogarden.web.dao._
 import scala.util.Try
+import java.util.Base64
 
 @Singleton
 class GithubServiceProvider @Inject() (@NamedCache("github-api-cache") cache: AsyncCacheApi, switchDao: SwitchDao) {
@@ -159,6 +160,18 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
       val treeSha = repoCommit.getCommit.getTree.getSha
       getTree(repository, treeSha)
     }
+  }
+
+  def getContentByTreeSha(repository: Repository, sha: String)(implicit sync: Boolean = false): Option[String] = {
+    val blob = this.dataService.getBlob(repository, sha)
+    val bytes = blob.getEncoding match {
+      case Blob.ENCODING_BASE64 =>
+        Base64.getMimeDecoder.decode(blob.getContent)
+      case Blob.ENCODING_UTF8 =>
+        blob.getContent.getBytes
+  	}
+    val content = new String(bytes, "utf-8")
+    if(blob == null) None else Some(content)
   }
 
   def getTree(repository: Repository, sha: String)(implicit sync: Boolean = false): Option[TreeEx] = {

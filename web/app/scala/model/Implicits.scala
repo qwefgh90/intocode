@@ -137,6 +137,7 @@ object Implicits extends RepositoryExtension {
     def writes(typo: Typo) = {
       Json.obj(
         "id" -> typo.id,
+        "treeSha" -> typo.treeSha,
         "path" -> typo.path
       )
     }
@@ -154,11 +155,12 @@ object Implicits extends RepositoryExtension {
     }
   }
 
-  implicit val typoAndComponentsToBrowser = new Writes[Tuple2[Typo, Seq[TypoComponent]]] {
-    def writes(tuple: Tuple2[Typo, Seq[TypoComponent]]) = {
+  implicit val typoAndComponentsToBrowser = new Writes[Tuple3[Typo, Seq[TypoComponent], String]] {
+    def writes(tuple: Tuple3[Typo, Seq[TypoComponent], String]) = {
       val typo = tuple._1
       val components = tuple._2
-      Json.toJsObject(typo)(typoToBrowser) ++ Json.obj("list" -> Json.toJson(components)(seq(typoComponentToBrowser)))
+      val body = tuple._3
+      Json.toJsObject(typo)(typoToBrowser) ++ Json.obj("offsetTuple" -> Json.toJson(components)(seq(typoComponentToBrowser)), "body" -> body)
     }
   }
   //SpellCheck
