@@ -18,6 +18,7 @@ import io.github.qwefgh90.repogarden.web.service.GithubServiceProvider
 
 @Singleton
 class AuthController @Inject()(authService: AuthServiceTrait, implicit val context: ExecutionContext, cache: AsyncCacheApi, githubProvider: GithubServiceProvider) extends Controller {
+
   def client = Action { implicit request =>
     val client_id = authService.getClientId
     val state = authService.getState
@@ -29,15 +30,14 @@ class AuthController @Inject()(authService: AuthServiceTrait, implicit val conte
     body.asJson.map{json => {
       val code = json \ "code"
       val state = json \ "state"
-      val clientId = json \ "clientId"
-      val params = Seq(code, state, clientId)
+      val params = Seq(code, state)
       if(params.forall(p => p.isDefined)){
-        val tokenFuture = authService.getAccessToken(code.as[String], state.as[String], clientId.as[String])
+        val tokenFuture = authService.getAccessToken(code.as[String], state.as[String])
         tokenFuture.map(token => {
           val githubService = githubProvider.getInstance(token)
           val user = githubService.getUser
           cache.set(user.getId.toString, token)
-          Ok("").withSession("signed" -> "signed","user" -> Json.toJson(user)(userWritesToSession).toString())}
+          Ok(Json.toJson(user)(userWritesToBrowser)).withSession("signed" -> "signed","user" -> Json.toJson(user)(userWritesToSession).toString())}
         ).recover{
           case e: RuntimeException => {
             Logger.warn(s"accessToken ${request.toString()} ${e} cache: ${cache}")

@@ -25,7 +25,7 @@ trait AuthServiceTrait {
   case class AccessToken(token: String, tokenType: String)
   def getState: String
   def getClientId: String
-  def getAccessToken(code: String, state: String, clientId: String): Future[String]
+  def getAccessToken(code: String, state: String): Future[String]
 }
 
 class AuthService (configuration: Configuration, encryption: Encryption, ws: WSClient, context: ExecutionContext, baseOAuthBaseUrl: String) extends AuthServiceTrait {
@@ -60,10 +60,10 @@ class AuthService (configuration: Configuration, encryption: Encryption, ws: WSC
   
   override def getClientId: String = clientId.get
   
-  override def getAccessToken(code: String, state: String, clientId: String): Future[String] = {
+  override def getAccessToken(code: String, state: String): Future[String] = {
     val response: Future[WSResponse] = ws.url(baseOAuthBaseUrl + accessTokenPath.get)
       .withHeaders("Accept" -> "application/json")
-      .post(Map("client_id" -> Seq(clientId)
+      .post(Map("client_id" -> Seq(getClientId)
         , "client_secret" -> Seq(clientSecret.get)
         , "code" -> Seq(code)
         , "state" -> Seq(state)))

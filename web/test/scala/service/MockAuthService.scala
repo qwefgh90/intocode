@@ -20,7 +20,7 @@ import play.Logger
 class MockAuthService(accessToken: String = "", clientId: String = "", state: String = "")(implicit val context: ExecutionContext) extends AuthServiceTrait {
   override def getState: String = "fake"
   override def getClientId: String = "fake"
-  override def getAccessToken(code: String, state: String, clientId: String): Future[String] = {
+  override def getAccessToken(code: String, state: String): Future[String] = {
     Future{
       accessToken
     }

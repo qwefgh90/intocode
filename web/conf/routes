@@ -10,3 +10,11 @@
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
 
 GET     /ws                         io.github.qwefgh90.repogarden.web.controllers.HomeController.ws
+
+GET     /client                     io.github.qwefgh90.repogarden.web.controllers.AuthController.client
+
+GET     /login/client             io.github.qwefgh90.repogarden.web.controllers.AuthController.client
+
+POST    /login                          io.github.qwefgh90.repogarden.web.controllers.AuthController.accessToken
+
+GET     /api/repositories                   io.github.qwefgh90.repogarden.web.controllers.HomeController.getOnlyRepositories

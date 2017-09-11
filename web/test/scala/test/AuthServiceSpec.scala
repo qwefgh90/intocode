@@ -59,7 +59,7 @@ class AuthServiceSpec extends PlaySpec with GuiceOneAppPerSuite {
   "AuthService" should {
 	"return access token" in {
       val authService = new MockAuthService(accessToken = "fake token")(context)
-      val result = Await.result(authService.getAccessToken("code", "state", "clientId"), 10.seconds)
+      val result = Await.result(authService.getAccessToken("code", "state"), 10.seconds)
       assert(result.equals("fake token"))
 	}
   }

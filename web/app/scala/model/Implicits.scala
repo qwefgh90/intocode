@@ -117,10 +117,10 @@ object Implicits extends RepositoryExtension {
 
   implicit val repositoryWritesToBrowser = new Writes[org.eclipse.egit.github.core.Repository] {
     def writes(repo: org.eclipse.egit.github.core.Repository) = Json.obj(
-      "owner" -> repo.getOwner.getName,
+      "id" -> repo.getId,
+      "owner" -> repo.getOwner.getLogin,
       "name" -> repo.getName,
-      "accessLink" -> repo.getUrl,
-      "activated" -> true
+      "accessLink" -> repo.getUrl
     )
   }
 

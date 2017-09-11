@@ -24,6 +24,8 @@ import akka.stream.Materializer
   */
 class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, githubProvider: GithubServiceProvider, typoDao: TypoDao ,switchDao: SwitchDao, @Named("pub-actor") pubActor: ActorRef, configuration: Configuration)(implicit ec: ExecutionContext, implicit val actorSystem: ActorSystem, materializer: Materializer) extends Controller with SameOriginCheck {
 
+  Await.ready(switchDao.create().flatMap(any => typoDao.create()), Duration(10, java.util.concurrent.TimeUnit.SECONDS))
+
   /**
     * Verify and accept a request
     * and then subscribe a channel.
@@ -76,8 +78,7 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
           Json.toJson(repository) match {
             case obj: JsObject => {
               val ynOpt = Await.result(switchDao.select(request.user.getId.toString, repository.getId.toString), 10 seconds).map(_.yn)
-              
-              obj + ("yn" -> JsBoolean(ynOpt.getOrElse(false)))
+              obj + ("activated" -> JsBoolean(ynOpt.getOrElse(false)))
             }
           }
         }))
