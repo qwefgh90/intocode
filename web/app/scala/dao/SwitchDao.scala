@@ -1,8 +1,11 @@
 package io.github.qwefgh90.repogarden.web.dao
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ ExecutionContext, Future, Await }
+import scala.concurrent.duration.Duration
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-
+import play.api.Logger
+import slick.jdbc.meta.MTable
 import io.github.qwefgh90.repogarden.web.model.Switch
 import play.api.db.slick.DatabaseConfigProvider
 import play.api.db.slick.HasDatabaseConfigProvider
@@ -14,8 +17,15 @@ class SwitchDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvide
 
   private val Switches = TableQuery[SwitchTable]
 
+  lazy val tables = Await.result(db.run(MTable.getTables), Duration(2, TimeUnit.SECONDS)).toList
+
   def create(): Future[Any] = {
-    db.run(DBIOAction.seq(Switches.schema.create))
+    if (tables.filter(tb => tb.name.name == Switches.baseTableRow.tableName
+    ).length == 0)
+      db.run(DBIOAction.seq(Switches.schema.create))
+    else
+      Future{}
+    
   }
 
   def drop(): Future[Any] = {

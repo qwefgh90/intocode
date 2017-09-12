@@ -1,8 +1,11 @@
 package io.github.qwefgh90.repogarden.web.dao
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ ExecutionContext, Future, Await }
+import scala.concurrent.duration.Duration
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-
+import play.api.Logger
+import slick.jdbc.meta.MTable
 import io.github.qwefgh90.repogarden.web.model.TypoStat
 import io.github.qwefgh90.repogarden.web.model.{Typo, TypoComponent}
 import io.github.qwefgh90.repogarden.web.model.TypoStatus._
@@ -11,11 +14,21 @@ import play.api.db.slick.HasDatabaseConfigProvider
 import slick.jdbc.JdbcProfile
 import slick.dbio._
 
+
 class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)(implicit executionContext: ExecutionContext) extends HasDatabaseConfigProvider[JdbcProfile] {
   import profile.api._
-  
+
+  lazy val tables = Await.result(db.run(MTable.getTables), Duration(2, TimeUnit.SECONDS)).toList
+
   def create(): Future[Any] = {
-    db.run(DBIOAction.seq(typoStats.schema.create, typos.schema.create, typoComponents.schema.create))
+    if (tables.filter(tb => tb.name.name == typoStats.baseTableRow.tableName
+&& tb.name.name == typos.baseTableRow.tableName
+&& tb.name.name == typoComponents.baseTableRow.tableName
+    ).length == 0) 
+      db.run(DBIOAction.seq(typoStats.schema.create, typos.schema.create, typoComponents.schema.create))
+    else
+      Future{}
+    
   }
 
   def insertTypoStat(typoStat: TypoStat): Future[Long] = {
