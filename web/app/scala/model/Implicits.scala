@@ -49,11 +49,14 @@ object Implicits extends RepositoryExtension {
   implicit val userWritesToBrowser = new Writes[org.eclipse.egit.github.core.User] {
     def writes(user: org.eclipse.egit.github.core.User) = Json.obj(
       "id" -> user.getId,
+      "login" -> user.getLogin,
       "username" -> user.getName,
       "firstName" -> "",
       "lastName" -> "",
       "expiredDate" -> "",
-      "imgUrl" -> user.getAvatarUrl
+      "imgUrl" -> user.getAvatarUrl,
+      "url" -> user.getUrl,
+      "htmlUrl" -> user.getHtmlUrl
     )
   }
 
@@ -120,7 +123,9 @@ object Implicits extends RepositoryExtension {
       "id" -> repo.getId,
       "owner" -> repo.getOwner.getLogin,
       "name" -> repo.getName,
-      "accessLink" -> repo.getUrl
+      "accessLink" -> repo.getUrl,
+      "defaultBranch" -> repo.getDefaultBranch,
+      "htmlUrl" -> repo.getHtmlUrl
     )
   }
 
@@ -147,8 +152,9 @@ object Implicits extends RepositoryExtension {
     def writes(comp: TypoComponent) = {
       Json.obj(
         "id" -> comp.id,
-        "from" -> comp.from,
+        "offset" -> comp.from,
         "to" -> comp.to,
+        "length" -> (comp.to - comp.from),
         "suggestedList" -> Json.parse(comp.suggestedList),
         "disabled" -> comp.disabled
       )

@@ -51,7 +51,7 @@ class GithubServiceSpec extends FlatSpec with Matchers with GuiceOneAppPerSuite 
     assert(repositories.length >= 0)
     if(repositories.length > 0 ){
       githubService.getAllRepositories.foreach{repo =>
-        Logger.debug(s"repository in org:  ${repo.getOwner.getLogin}, ${repo.getOwner.getId}, ${repo.getOwner.getUrl}, ${repo.getName}")
+        Logger.debug(s"repository in org:  ${repo.getOwner.getLogin}, ${repo.getOwner.getId}, ${repo.getOwner.getUrl}, ${repo.getName}, ${repo.getDefaultBranch}")
       }
       val repo = repositories(0)
       val branches = githubService.getBranches(repo)

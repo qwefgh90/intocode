@@ -18,3 +18,13 @@ GET     /login/client             io.github.qwefgh90.repogarden.web.controllers.
 POST    /login                          io.github.qwefgh90.repogarden.web.controllers.AuthController.accessToken
 
 GET     /api/repositories                   io.github.qwefgh90.repogarden.web.controllers.HomeController.getOnlyRepositories
+
+GET     /api/repositories/:owner/:repoName/branches  io.github.qwefgh90.repogarden.web.controllers.HomeController.getBranches(owner, repoName)
+
+GET     /api/repositories/:owner/:repoName/branches/:branchName/typoStats  io.github.qwefgh90.repogarden.web.controllers.TypoController.getTypoStats(owner, repoName, branchName)
+
+POST     /api/repositories/:owner/:repoName/branches/:branchName/typoStats  io.github.qwefgh90.repogarden.web.controllers.TypoController.buildLastCommit(owner, repoName, branchName)
+
+GET     /api/repositories/:owner/:repoName/trees  io.github.qwefgh90.repogarden.web.controllers.HomeController.getTreeByCommitSha(owner, repoName, commitSha)
+
+GET     /api/repositories/:owner/:repoName/branches/:branchName/typostats/:typoStatId/typos  io.github.qwefgh90.repogarden.web.controllers.TypoController.getTypos(owner, repoName, branchName, typoStatId: Long)

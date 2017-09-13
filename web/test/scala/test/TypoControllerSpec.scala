@@ -121,7 +121,7 @@ class TypoControllerSpec extends PlaySpec with BeforeAndAfterAll {
       (commitsJson \\ "id").find(_.as[JsNumber].value == id1).isDefined mustBe true
       (commitsJson \\ "id").find(_.as[JsNumber].value == id2).isDefined mustBe true
 
-      val typosResult = typoController.getTypos(owner, name, id1)(authFr)
+      val typosResult = typoController.getTypos(owner, name, branchName, id1)(authFr)
 
       val typosJson = contentAsJson(typosResult)
       val typosListFromService = Await.result(typoDao.selectTypos(id1), Duration(10, TimeUnit.SECONDS))

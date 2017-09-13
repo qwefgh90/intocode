@@ -72,8 +72,7 @@ class TypoController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
   /*
    * Get positions of typo and suggested word list.
    */
-  def getTypos(owner: String, name: String, typoStatId: Long) = (builder andThen builder.UserAction andThen builder.TypoStatPermissionCheckAction(typoStatId)).async { implicit request =>
-    // need validate!!
+  def getTypos(owner: String, name: String, branchName: String, typoStatId: Long) = (builder andThen builder.UserAction andThen builder.TypoStatPermissionCheckAction(typoStatId)).async { implicit request =>
 
     val githubService = githubProvider.getInstance(request.token)
     val repositoryOpt = githubService.getRepository(owner, name)
