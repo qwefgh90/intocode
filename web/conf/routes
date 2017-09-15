@@ -19,6 +19,8 @@ POST    /login                          io.github.qwefgh90.repogarden.web.contro
 
 GET     /api/repositories                   io.github.qwefgh90.repogarden.web.controllers.HomeController.getOnlyRepositories
 
+PUT     /api/repositories/:owner/:repoName  io.github.qwefgh90.repogarden.web.controllers.HomeController.updateRepositoryActivated(owner, repoName)
+
 GET     /api/repositories/:owner/:repoName/branches  io.github.qwefgh90.repogarden.web.controllers.HomeController.getBranches(owner, repoName)
 
 GET     /api/repositories/:owner/:repoName/branches/:branchName/typoStats  io.github.qwefgh90.repogarden.web.controllers.TypoController.getTypoStats(owner, repoName, branchName)

@@ -42,9 +42,9 @@ class SwitchDaoSpec extends PlaySpec with GuiceOneAppPerSuite {
 
   "SwitchDao" should {
     Await.result(switchDao.create(), Duration(10, TimeUnit.SECONDS))
-    val switch1 = Switch("123414913849", "1023002310", false)
-    val switch2 = Switch("3423423", "3242425", true)
-    val switch3 = Switch("5543334", "646434", false)
+    val switch1 = Switch(123414913849L, 1023002310L, false)
+    val switch2 = Switch(3423423L, 3242425L, true)
+    val switch3 = Switch(5543334L, 646434L, false)
     Await.result(switchDao.insert(switch1), Duration(10, TimeUnit.SECONDS))
     Await.result(switchDao.insert(switch2), Duration(10, TimeUnit.SECONDS))
     Await.result(switchDao.insert(switch3), Duration(10, TimeUnit.SECONDS))

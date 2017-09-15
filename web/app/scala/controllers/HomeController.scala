@@ -8,9 +8,10 @@ import io.github.qwefgh90.repogarden.web.controllers._
 import scala.concurrent.ExecutionContext
 import scala.concurrent._
 import scala.concurrent.duration._
+import java.util.concurrent.TimeUnit
 import play.api.libs.json._
 import io.github.qwefgh90.repogarden.web.model.Implicits._
-import io.github.qwefgh90.repogarden.web.model.UserInformation
+import io.github.qwefgh90.repogarden.web.model.{UserInformation, Switch}
 import io.github.qwefgh90.repogarden.web.service._
 import io.github.qwefgh90.repogarden.web.dao._
 import io.github.qwefgh90.repogarden.web.actor._
@@ -77,7 +78,7 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
         val result = Json.toJson(githubService.getAllRepositories.map(repository => {
           Json.toJson(repository) match {
             case obj: JsObject => {
-              val ynOpt = Await.result(switchDao.select(request.user.getId.toString, repository.getId.toString), 10 seconds).map(_.yn)
+              val ynOpt = Await.result(switchDao.select(request.user.getId, repository.getId), 10 seconds).map(_.yn)
               obj + ("activated" -> JsBoolean(ynOpt.getOrElse(false)))
             }
           }
@@ -140,6 +141,33 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     }).getOrElse(BadRequest("a requested tree does not exists"))
   }
 
+  def updateRepositoryActivated(owner: String, name: String) = (builder andThen builder.UserAction andThen builder.PermissionCheckAction(owner, name)) { implicit request =>
+    val body: AnyContent = request.body
+    val jsonBody: Option[JsValue] = body.asJson
+    val token = request.token
+    if(jsonBody.isDefined){
+      val activatedOpt = (jsonBody.get \ "activated").asOpt[Boolean]
+      activatedOpt.map(activated => {
+        val githubService = githubProvider.getInstance(token)
+        val repoOpt = githubService.getRepository(owner, name)
+        repoOpt.map(repo => repo.getId).map{repoId =>
+          val opResult = scala.util.Try(Await.result(switchDao.insertOrUpdate(Switch(request.user.getId, repoId, activated)), Duration(10, TimeUnit.SECONDS)))
+          opResult.transform(v => scala.util.Try(Ok)
+            ,ex => {
+              Logger.error("", ex)
+              scala.util.Try(InternalServerError)
+            }
+          ).get
+        }.getOrElse{
+          BadRequest
+        }
+      }).getOrElse{
+        BadRequest("Expecting parameters")
+      }
+    }else{
+      BadRequest("Expecting application/json request body")
+    }
+  }
 
 }
 

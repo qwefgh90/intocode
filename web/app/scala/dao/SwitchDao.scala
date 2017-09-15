@@ -25,14 +25,13 @@ class SwitchDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvide
       db.run(DBIOAction.seq(Switches.schema.create))
     else
       Future{}
-    
   }
 
   def drop(): Future[Any] = {
     db.run(DBIOAction.seq(Switches.schema.drop))
   }
 
-  def select(userId: String, repositoryId: String) = {
+  def select(userId: Long, repositoryId: Long) = {
     db.run(Switches.filter(tb => tb.userId === userId && tb.repositoryId === repositoryId).result.headOption)
   }
 
@@ -40,16 +39,20 @@ class SwitchDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvide
 
   def insert(switch: Switch): Future[Unit] = db.run(Switches += switch).map { _ => () }
 
-  def updateSwitch(userId: String, repositoryId: String, yn: Boolean) = {
+  def updateSwitch(userId: Long, repositoryId: Long, yn: Boolean): Future[Int] = {
     val updateAction = Switches.filter(st => st.userId === userId && st.repositoryId === repositoryId).map(st => (st.yn)).update(yn)
     db.run(updateAction)
   }
 
-  private class SwitchTable(tag: Tag) extends Table[Switch](tag, "SWITCHES") {
-    def userId = column[String]("USER_ID")
-    def repositoryId = column[String]("REPOSITORY_ID")
-    def yn = column[Boolean]("YN")
+  def insertOrUpdate(switch: Switch): Future[Int] = {
+    db.run(Switches.insertOrUpdate(switch))
+  }
 
+  private class SwitchTable(tag: Tag) extends Table[Switch](tag, "SWITCHES") {
+    def userId = column[Long]("USER_ID")
+    def repositoryId = column[Long]("REPOSITORY_ID")
+    def yn = column[Boolean]("YN")
+    def pk = primaryKey("pk_switch_table", (userId, repositoryId))
     def * = (userId, repositoryId, yn) <> (Switch.tupled, Switch.unapply)
   }
 }
