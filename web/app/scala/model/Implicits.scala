@@ -92,7 +92,7 @@ object Implicits extends RepositoryExtension {
         "startTime" -> typoStat.startTime,
         "completetime" -> typoStat.completeTime,
         "message" -> typoStat.message,
-        "id" -> typoStat.id
+        "typoStatId" -> typoStat.id
       )
     }
   }
@@ -114,7 +114,7 @@ object Implicits extends RepositoryExtension {
 
   implicit val treeExWritesToBrowser = new Writes[io.github.qwefgh90.repogarden.bp.github.Implicits.TreeEx] {
     def writes(tree: io.github.qwefgh90.repogarden.bp.github.Implicits.TreeEx) = {
-      Json.arr(tree.list)
+      Json.toJson(tree.list)(seq(treeEntryWritesToBrowser))
     }
   }
 
