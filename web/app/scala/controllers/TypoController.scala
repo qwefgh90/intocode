@@ -98,13 +98,21 @@ class TypoController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
   /*
    * Put up a disable flag of a component.
    */
-  def disableTypoComponent(typoComponentId: Long, disabled: Boolean) = (builder andThen builder.UserAction andThen builder.TypoCompPermissionCheckAction(typoComponentId)).async { implicit request =>
-    typoDao.updateDisabledToTypoComponent(typoComponentId, disabled).map{count => 
-        Ok
-    }.recover{
-      case t =>
-        Logger.error("",t)
-        InternalServerError
-    }
+  def disableTypoComponent(owner: String, repoName: String, branchName: String, typoStatId: Long, typoId: Long, typoComponentId: Long) = (builder andThen builder.UserAction andThen builder.TypoCompPermissionCheckAction(typoComponentId)).async { implicit request =>{
+    val body: AnyContent = request.body
+    val jsonBody: Option[JsValue] = body.asJson
+    jsonBody.flatMap(jsValue => {
+      val disabledOpt = (jsValue \ "disabled").asOpt[Boolean]
+      disabledOpt.map{disabled => 
+        typoDao.updateDisabledToTypoComponent(typoComponentId, disabled).map{count =>
+          Ok
+        }.recover{
+          case t =>
+            Logger.error("",t)
+            InternalServerError
+        }
+      }
+    }).getOrElse(Future(BadRequest))
+  }
   }
 }

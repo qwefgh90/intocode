@@ -30,3 +30,5 @@ POST     /api/repositories/:owner/:repoName/branches/:branchName/typoStats  io.g
 GET     /api/repositories/:owner/:repoName/trees  io.github.qwefgh90.repogarden.web.controllers.HomeController.getTreeByCommitSha(owner, repoName, commitSha)
 
 GET     /api/repositories/:owner/:repoName/branches/:branchName/typostats/:typoStatId/typos  io.github.qwefgh90.repogarden.web.controllers.TypoController.getTypos(owner, repoName, branchName, typoStatId: Long)
+
+PUT     /api/repositories/:owner/:repoName/branches/:branchName/typostats/:typoStatId/typos/:typoId/typoCompId/:typoCompId  io.github.qwefgh90.repogarden.web.controllers.TypoController.disableTypoComponent(owner, repoName, branchName, typoStatId: Long, typoId: Long, typoCompId: Long)
