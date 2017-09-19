@@ -47,8 +47,12 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
     db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.branchName === branchName && stat.userId === userId).sortBy(_.startTime.desc.nullsLast).result)
   }
 
+  def selectTypoStats(ownerId: Long, repositoryId: Long, branchName: String, userId: Long, status: TypoStatus): Future[Seq[TypoStat]] = {
+    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.branchName === branchName && stat.userId === userId && stat.status === status.toString).sortBy(_.startTime.desc.nullsLast).result)
+  }
+
   def selectLastTypoStat(ownerId: Long, repositoryId: Long, branchName: String, userId: Long): Future[Option[TypoStat]] = {
-    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.branchName === branchName && stat.userId === userId).sortBy(_.startTime.desc.nullsFirst).take(1).result.headOption)
+    db.run(typoStats.filter(stat => stat.ownerId === ownerId && stat.repositoryId === repositoryId && stat.branchName === branchName && stat.userId === userId).sortBy(_.startTime.desc.nullsLast).take(1).result.headOption)
   }
 
   def deleteTypoStat(id: Long): Future[Int] = {
@@ -97,6 +101,10 @@ class TypoDao @Inject() (protected val dbConfigProvider: DatabaseConfigProvider)
   def selectTypos(ownerId: Long, repositoryId: Long, commitSha: String): Future[Seq[Typo]] = {
     this.selectTypoStat(ownerId, repositoryId, commitSha).map(stat => stat.get.id.get).flatMap(
       id => this.selectTypos(id))
+  }
+
+  def deleteTypos(parentId: Long): Future[Int] = {
+    db.run(typos.filter(_.parentId === parentId).delete)
   }
 
   def insertTypoComponents(parentId: Long, list: List[TypoComponent]): Future[Option[Int]] = {

@@ -15,13 +15,28 @@ object TypoRequest extends ((Long, Long, String, String, Long, TreeEx) => TypoRe
   //replace the toString implementation coming from the inherited class (FunctionN)
   override def toString =
     getClass.getName.split("""\$""").reverse.dropWhile(x => {val char = x.take(1).head; !((char == '_') || char.isLetter)}).head
+
   def createLastRequest(githubService: GithubService, owner: String, repoName: String, branchName: String): Option[TypoRequest] = {
     val repoOpt = githubService.getRepository(owner, repoName)
     repoOpt.flatMap{repo =>
       val ownerId: Long = repo.getOwner.getId
       val repositoryId = repo.getId
       val commitOpt = githubService.getLastestCommitByBranchName(repo, branchName)
-      commitOpt.map{commit => 
+      commitOpt.map{commit =>
+        val userId: Long = githubService.getUser.getId
+        val treeEx = githubService.getTree(repo, commit.getCommit.getTree.getSha)(true).get
+        TypoRequest(ownerId, repositoryId, branchName, commit.getSha, userId, treeEx)
+      }
+    }
+  }
+  
+  def createRequest(githubService: GithubService, owner: String, repoName: String, branchName: String, commitSha: String): Option[TypoRequest] = {
+    val repoOpt = githubService.getRepository(owner, repoName)
+    repoOpt.flatMap{repo =>
+      val ownerId: Long = repo.getOwner.getId
+      val repositoryId = repo.getId
+      val commitOpt = githubService.getCommit(repo, commitSha)
+      commitOpt.map{commit =>
         val userId: Long = githubService.getUser.getId
         val treeEx = githubService.getTree(repo, commit.getCommit.getTree.getSha)(true).get
         TypoRequest(ownerId, repositoryId, branchName, commit.getSha, userId, treeEx)

@@ -43,6 +43,26 @@ class TypoController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     }
   }
 
+  def buildCommit(owner: String, name: String, branchName: String) = (builder andThen builder.UserAction andThen builder.PermissionCheckAction(owner, name)).async {request =>
+    val body: AnyContent = request.body
+    val jsonBody: Option[JsValue] = body.asJson
+    val commitShaOpt = jsonBody.flatMap(jsValue => (jsValue \ "commitSha").asOpt[String])
+    val githubService = githubProvider.getInstance(request.token)
+    val reqOpt = if(commitShaOpt.isDefined)
+      TypoRequest.createRequest(githubService, owner, name, branchName, commitShaOpt.get)
+    else TypoRequest.createLastRequest(githubService, owner, name, branchName)
+    //TypoRequest.createLastRequest(githubService, owner, name, branchName)
+    reqOpt.map{req =>
+      typoService.build(req, Duration(2, TimeUnit.SECONDS)).map{id =>
+        Ok(Json.obj("id" -> id))
+      }
+    }.getOrElse{
+      Future{
+        BadRequest("invalid paremters")
+      }
+    }
+  }
+
   /*
    * Get a list of typostats in the branch.
    */

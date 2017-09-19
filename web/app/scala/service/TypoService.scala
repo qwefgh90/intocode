@@ -31,6 +31,8 @@ import akka.actor.ActorRef
 import io.github.qwefgh90.repogarden.web.actor.PubActor._
 
 class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache") cache: AsyncCacheApi, @Named("pub-actor") pubActor: ActorRef)(implicit executionContext: ExecutionContext) {
+
+  
   /*
    * Start to check spells and get id for a event.
    */
@@ -41,8 +43,14 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
           currentIdOpt.get
         }
       }else{
-        val idFuture = getNewId(typoRequest)
-        idFuture.map(parentId => {
+        val idFuture = getFailedId(typoRequest)
+          .flatMap{failedIdOpt =>
+            if(failedIdOpt.isEmpty)
+              getNewId(typoRequest)
+            else
+              Future(failedIdOpt.get)
+          }
+        idFuture.onSuccess{case parentId => {
           Future{blocking{Thread.sleep(delay.toMillis)}}.flatMap{unit =>
             checkSpell(parentId, typoRequest).flatMap{list => 
               typoDao.insertTypoAndDetailList(list).flatMap{numOpt =>
@@ -52,6 +60,9 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
                   pubActor ! TerminateMessage(parentId, None)
                 }
                 updateFuture.onFailure{case t =>
+                  typoDao.deleteTypos(parentId).onFailure{case t =>
+                    Logger.error(s"Fail to clean up typos of ${parentId}", t)
+                  }
                   pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FAILED.toString))
                   pubActor ! TerminateMessage(parentId, None)
                   Logger.error("", t)
@@ -71,11 +82,10 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
                   pubActor ! TerminateMessage(parentId, None)
                   Logger.error("", t)
                 }
-                updateFuture
               }
             }}
-          parentId
-        })
+        }}
+        idFuture
       }
     })
   }
@@ -149,11 +159,21 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
    * Return a running job's id whose status is progress.
    */
   private def getRunningId(typoRequest: TypoRequest): Future[Option[Long]] = {
-    typoDao.selectLastTypoStat(typoRequest.ownerId, typoRequest.repositoryId, typoRequest.branchName, typoRequest.userId).map(typoStatOpt => {
-      if(typoStatOpt.map(typoStat => TypoStatus.withName(typoStat.status) == TypoStatus.PROGRESS).getOrElse(false))
-        typoStatOpt.map(_.id.get)
-      else
-        None
+    typoDao.selectTypoStats(typoRequest.ownerId, typoRequest.repositoryId, typoRequest.branchName, typoRequest.userId, TypoStatus.PROGRESS).map(typoStatSeq => {
+      if(typoStatSeq.length > 0)
+        typoStatSeq.head.id
+      else None
+    })
+  }
+
+  /*
+   * Return a running job's id whose status is failed.
+   */
+  private def getFailedId(typoRequest: TypoRequest): Future[Option[Long]] = {
+    typoDao.selectTypoStats(typoRequest.ownerId, typoRequest.repositoryId, typoRequest.branchName, typoRequest.userId, TypoStatus.FAILED).map(typoStatSeq => {
+      if(typoStatSeq.length > 0)
+        typoStatSeq.head.id
+      else None
     })
   }
 }

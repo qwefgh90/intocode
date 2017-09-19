@@ -82,6 +82,7 @@ class TypoControllerSpec extends PlaySpec with BeforeAndAfterAll {
     val owner = "repogarden"
     val name = "repogarden-test"
     val branchName = "master"
+    val firstCommitSha = "569a599e7ff48c07a85ce323c53a6a8a2389f982"
     val mockAuthService = new MockAuthService(accessToken = oauthToken)(context)
     val authController = new AuthController(mockAuthService, context, cache, githubProvider)
     val result = authController.accessToken.apply(FakeRequest().withJsonBody(Json.parse("""{"code":"code", "state":"state", "clientId":"clientId"}""")))
@@ -105,12 +106,38 @@ class TypoControllerSpec extends PlaySpec with BeforeAndAfterAll {
       id
     }
 
+    def blockingToFindTypoInFirst(): Long = {
+      val jsonFr = authFr.withJsonBody(Json.parse(s"""{"commitSha": "${firstCommitSha}"}"""))
+      val result = typoController.buildCommit(owner, name, branchName)(jsonFr)
+      val js = contentAsJson(result)
+      status(result) mustBe OK
+      val id = (js \ "id").as[Long]
+      Logger.debug("a registerd id: " + id)
+
+      eventually(new Timeout(Span(40, Seconds)), new Interval(Span(1, Seconds))){
+        val typoStatOpt = Await.result(typoDao.selectTypoStat(id), Duration(2, TimeUnit.SECONDS))
+        typoStatOpt.isDefined mustBe true
+        typoStatOpt.get.status mustBe FINISHED.toString
+      }
+      id
+    }
+
+    "return a first commit after finding typos" in {
+      val id1 = blockingToFindTypoInFirst()
+
+      val commitsResult = typoController.getTypoStats(owner, name, branchName)(authFr)
+      val commitsJson = contentAsJson(commitsResult)
+
+      status(commitsResult) mustBe OK
+      (commitsJson \\ "typoStatId").find(_.as[JsNumber].value == id1).isDefined mustBe true
+      (commitsJson \\ "sha").find(_.as[JsString].value == firstCommitSha).isDefined mustBe true
+    }
+
     "return a commit and typo list after finding typos" in {
       val commitsResultBefore = typoController.getTypoStats(owner, name, branchName)(authFr)
       val arr = contentAsJson(commitsResultBefore).as[JsArray]
 
       status(commitsResultBefore) mustBe OK
-      arr.value.length mustBe 0
 
       val id1 = blockingToFindTypo()
       val id2 = blockingToFindTypo()
@@ -118,12 +145,12 @@ class TypoControllerSpec extends PlaySpec with BeforeAndAfterAll {
       val commitsJson = contentAsJson(commitsResult)
 
       status(commitsResult) mustBe OK
-      (commitsJson \\ "id").find(_.as[JsNumber].value == id1).isDefined mustBe true
-      (commitsJson \\ "id").find(_.as[JsNumber].value == id2).isDefined mustBe true
+      (commitsJson \\ "typoStatId").find(_.as[JsNumber].value == id1).isDefined mustBe true
+      (commitsJson \\ "typoStatId").find(_.as[JsNumber].value == id2).isDefined mustBe true
 
       val typosResult = typoController.getTypos(owner, name, branchName, id1)(authFr)
-
       val typosJson = contentAsJson(typosResult)
+
       val typosListFromService = Await.result(typoDao.selectTypos(id1), Duration(10, TimeUnit.SECONDS))
 
       status(typosResult) mustBe OK
