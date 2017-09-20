@@ -56,14 +56,14 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
               typoDao.insertTypoAndDetailList(list).flatMap{numOpt =>
                 val updateFuture = typoDao.updateTypoStat(parentId, TypoStatus.FINISHED, "", Some(System.currentTimeMillis))
                 updateFuture.onSuccess{case num => 
-                  pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FINISHED.toString))
+                  pubActor ! PubMessage(parentId, Json.toJson(Map("status" -> TypoStatus.FINISHED.toString)))
                   pubActor ! TerminateMessage(parentId, None)
                 }
                 updateFuture.onFailure{case t =>
                   typoDao.deleteTypos(parentId).onFailure{case t =>
                     Logger.error(s"Fail to clean up typos of ${parentId}", t)
                   }
-                  pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FAILED.toString))
+                  pubActor ! PubMessage(parentId, Json.toJson(Map("status" -> TypoStatus.FAILED.toString)))
                   pubActor ! TerminateMessage(parentId, None)
                   Logger.error("", t)
                 }
@@ -73,12 +73,12 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
               case t => {
                 val updateFuture = typoDao.updateTypoStat(parentId, TypoStatus.FAILED, t.toString, Some(System.currentTimeMillis))
                 updateFuture.onSuccess{case num =>
-                  pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FAILED.toString))
+                  pubActor ! PubMessage(parentId, Json.toJson(Map("status" -> TypoStatus.FAILED.toString)))
                   pubActor ! TerminateMessage(parentId, None)
                   Logger.error("", t)
                 }
                 updateFuture.onFailure{case t =>
-                  pubActor ! PubMessage(parentId, Json.toJson("status" -> TypoStatus.FAILED.toString))
+                  pubActor ! PubMessage(parentId, Json.toJson(Map("status" -> TypoStatus.FAILED.toString)))
                   pubActor ! TerminateMessage(parentId, None)
                   Logger.error("", t)
                 }

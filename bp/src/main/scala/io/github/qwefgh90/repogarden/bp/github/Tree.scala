@@ -38,15 +38,16 @@ trait Tree2 {
     private var encoding: String = ""
     private var bytes: Array[Byte] = Array()
     private var sync: Boolean = false
+    private var provider: Boolean = false
+    private var repository: Repository = null
+    private var dataService: DataService = null
 
     def getContent: Option[String] = {
+      if(!provider)
+        throw new IllegalAccessException("The provider does not exists. please call syncContent()")
       if(!sync)
-        throw new IllegalAccessException("The content does not loaded. please call syncContent()")
-      if(encoding == Blob.ENCODING_UTF8 || encoding == Blob.ENCODING_BASE64){
-        Option(content)
-      }else{
-        Option.empty
-      }
+        syncContent()
+      Option(content)
     }
 
     def getBytes = {
@@ -56,9 +57,10 @@ trait Tree2 {
     }
 
     def isSync = sync
+    def hasProvider = provider
 
-    def syncContent(repository: Repository, dataService: DataService){
-      if(!sync){
+    private def syncContent(){
+      if(hasProvider){
   	    val sha: String = entry.getSha// this.getSha
   	    val blob = dataService.getBlob(repository, sha)
         blob.getEncoding match {
@@ -71,6 +73,12 @@ trait Tree2 {
         content = new String(bytes, "utf-8")
         sync = true
       }
+    }
+
+    def syncContent(repository: Repository, dataService: DataService){
+      this.repository = repository
+      this.dataService = dataService
+      provider = true
     }
   }
 

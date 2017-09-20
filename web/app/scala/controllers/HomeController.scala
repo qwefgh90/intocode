@@ -41,7 +41,7 @@ class HomeController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
       else if(channelIdOpt.isEmpty)
         Left(BadRequest)
       else if(tokenOpt.isEmpty)
-        Left(Unauthorized)
+        Left(Unauthorized) 
       else
         Right(ActorFlow.actorRef { out =>
           ClientActor.props(out, rh, channelIdOpt.get, userOpt.get)

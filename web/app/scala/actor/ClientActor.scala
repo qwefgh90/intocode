@@ -25,7 +25,7 @@ class ClientActor(out: ActorRef, rh: RequestHeader, channelId: String, user: Use
     case SubscribeAck(Subscribe(channelId, None, `self`)) ⇒{
       Logger.debug(s"A channel is open: ${channelId}")
       Logger.debug(s"${rh.remoteAddress} starts to subscribe: ${channelId}")
-    }
+    } 
     case Poison => {
       Logger.debug("terminate: " + channelId.toString)
       context.stop(self)
