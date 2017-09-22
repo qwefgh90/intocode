@@ -100,7 +100,8 @@ class TypoController @Inject()(builder: ActionBuilder, cache: AsyncCacheApi, git
     typoDao.selectTypos(typoStatId).flatMap{ typos =>
       Future.sequence(typos.map{typo =>
         repositoryOpt.flatMap{repository => 
-          githubService.getContentByTreeSha(repository, typo.treeSha).map{body =>
+          Logger.debug(typo.path.reverse.takeWhile(c => c != '/' && c != '\\').reverse)
+          githubService.getContentByTreeSha(repository, typo.treeSha, typo.path.reverse.takeWhile(c => c != '/' && c != '\\').reverse).map{body =>
             typoDao.selectTypoComponents(typo.id.get).map{ components =>
               (typo, components, body)
             }

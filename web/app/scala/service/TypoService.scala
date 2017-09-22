@@ -5,6 +5,7 @@ import javax.inject._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
+import io.github.qwefgh90.repogarden.bp.Boilerplate._
 import io.github.qwefgh90.repogarden.web.model.TypoStatus._
 import javax.inject._
 import org.eclipse.egit.github.core._
@@ -29,6 +30,8 @@ import org.languagetool._
 import org.languagetool.rules.spelling.SpellingCheckRule
 import akka.actor.ActorRef
 import io.github.qwefgh90.repogarden.web.actor.PubActor._
+import io.github.qwefgh90.jsearch.JSearch
+import java.nio.file.Files
 
 class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache") cache: AsyncCacheApi, @Named("pub-actor") pubActor: ActorRef)(implicit executionContext: ExecutionContext) {
 
@@ -115,10 +118,19 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
       val visitor = new io.github.qwefgh90.repogarden.bp.github.Implicits.Visitor[TreeEntryEx, List[(Typo, List[TypoComponent])]]{
         override var acc: List[(Typo, List[TypoComponent])] = List[(Typo, List[TypoComponent])]()
         override def enter(node: TreeEntryEx, stack: List[TreeEntryEx]){
-          val contentOpt = scala.util.Try(node.getContent).getOrElse(None)
-          if(contentOpt.isDefined){
+          val bytesOpt = scala.util.Try(node.getBytes)
+          if(bytesOpt.isSuccess){
             import io.github.qwefgh90.repogarden.extractor._
-            val stream = new java.io.ByteArrayInputStream(contentOpt.get.getBytes("utf-8"))
+            val bytes = bytesOpt.get
+            val content = bytesToReadableString(bytes, node.name)
+/*
+            val tempPath = Files.createTempFile("for_extract", node.name)
+            Files.write(tempPath, bytes)
+
+            val content = JSearch.extractContentsFromFile(tempPath.toFile)
+            Files.delete(tempPath)*/
+
+            val stream = new java.io.ByteArrayInputStream(content.getBytes)
             val comment = Extractor.extractCommentsByStream(stream, node.name).getOrElse(List())
             stream.close()
 
@@ -128,7 +140,7 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
                 val c = TypoComponent(None, None, node.entry.getPath, result.startOffset + ruleMatch.getFromPos, result.startOffset + ruleMatch.getToPos, ruleMatch.getLine, ruleMatch.getColumn, Json.toJson(ruleMatch.getSuggestedReplacements.asScala.toList).toString)
 
                Logger.debug(s"(${node.name} | ${result.startOffset} | ${c.from} | ${c.to} | ${result.comment.length} | ${ruleMatch.getRule.getId.toString} | ${ruleMatch.getRule.getCategory.getId.toString} | ${node.entry.getSha})")
-               Logger.debug(s"${contentOpt.get.substring(c.from, c.to)} => ${c.suggestedList.toString}")
+               Logger.debug(s"${content.substring(c.from, c.to)} => ${c.suggestedList.toString}")
                 c
               }).toList
             }.foldRight(List[TypoComponent]())((e, acc) => {e ++ acc})

@@ -15,7 +15,7 @@ import io.github.qwefgh90.jsearch._
 import com.typesafe.scalalogging._
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
-
+import java.nio.file.Files
 
 /** Object to extract comments. */
 object Extractor {
@@ -36,7 +36,7 @@ object Extractor {
 	  val tempFile = File.createTempFile("will be deleted", "will be deleted");
   	  tempFile.deleteOnExit()
   	  readUri(uri){is =>
-    	  val result = extractComments(is, JSearch.getContentType(tempFile, fileName), charset)
+    	  val result = extractComments(is, fileName, JSearch.getContentType(tempFile, fileName), charset)
     	  result.map{list => {
     		  for(comment <- list; str = new String(comment.charArray))
     			  yield ExtractResult(comment.startOffset, str, uri)
@@ -48,7 +48,7 @@ object Extractor {
   def extractCommentsByStream(is: InputStream, fileName: String, charset: Charset = StandardCharsets.UTF_8): Option[List[ExtractResult]] = {
 	val tempFile = File.createTempFile("will be deleted", "will be deleted");
   	tempFile.deleteOnExit()
-    val result = extractComments(is, JSearch.getContentType(tempFile, fileName), charset)
+    val result = extractComments(is, fileName, JSearch.getContentType(tempFile, fileName), charset)
     result.map{list => {
       for(comment <- list; str = new String(comment.charArray))
       yield ExtractResult(comment.startOffset, str, tempFile.toURI)
@@ -62,7 +62,7 @@ object Extractor {
     * @param mediaType a media type that decide a parser
     * @return a list of byte arrays
     */
-  private def extractComments(stream: InputStream, mediaType: MediaType, charset: Charset): Option[List[CommentResult]] = {
+  private def extractComments(stream: InputStream, fileName: String, mediaType: MediaType, charset: Charset): Option[List[CommentResult]] = {
     val streamReader = new InputStreamReader(stream, charset)
     mediaType match {
       case JAVA_TYPE => { 
@@ -108,8 +108,8 @@ object Extractor {
         parseShType(streamReader)
       }
       case _ => {
-        Some(List(CommentResult(0, streamToArray(streamReader))))
-//        Option.empty
+        val chars = streamToArray(streamReader)
+        Some(List(CommentResult(0, chars)))
       }
     }
   }

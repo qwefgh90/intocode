@@ -6,7 +6,8 @@ import java.nio.charset.Charset
 import org.mozilla.universalchardet.UniversalDetector
 import scala.collection.mutable._
 import java.security.InvalidParameterException
-
+import io.github.qwefgh90.jsearch.JSearch
+import java.nio.file.Files
 
 object Boilerplate {
   
@@ -41,6 +42,12 @@ object Boilerplate {
     buf.toArray
   }
 
+  implicit def streamToArray(stream: InputStream): Array[Byte] = {
+    val buf = new ArrayBuffer[Byte](50000) //50KB
+    readStream(stream)(buf+=_)
+    buf.toArray
+  }
+
   /** Automatically close the stream after run op().
     * 
     * @param inputStream a inputstream to close
@@ -63,6 +70,14 @@ object Boilerplate {
     handler(before, after)
   }
 
+  def bytesToReadableString(bytes: Array[Byte], fileName: String): String = {
+    val tempPath = Files.createTempFile("for_extract", "" + fileName)
+    Files.write(tempPath, bytes)
+    val content = JSearch.extractContentsFromFile(tempPath.toFile)
+    Files.delete(tempPath)
+    content
+  }
+
   /**
    * Read all bytes from stream and don't close it.
    * 
@@ -72,6 +87,14 @@ object Boilerplate {
     var currentByte = stream.read()
     while(currentByte != -1){
       op(currentByte.toChar)
+      currentByte = stream.read()
+    }
+  }
+
+  def readStream(stream: InputStream)(op: Byte => Unit) = {
+    var currentByte = stream.read()
+    while(currentByte != -1){
+      op(currentByte)
       currentByte = stream.read()
     }
   }

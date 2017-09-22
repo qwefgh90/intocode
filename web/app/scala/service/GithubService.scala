@@ -6,6 +6,7 @@ import javax.inject._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
+import io.github.qwefgh90.repogarden.bp.Boilerplate._
 import javax.inject._
 import org.eclipse.egit.github.core._
 import org.eclipse.egit.github.core.service._
@@ -162,7 +163,7 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
     }
   }
 
-  def getContentByTreeSha(repository: Repository, sha: String)(implicit sync: Boolean = false): Option[String] = {
+  def getContentByTreeSha(repository: Repository, sha: String, fileName: String)(implicit sync: Boolean = false): Option[String] = {
     val blob = this.dataService.getBlob(repository, sha)
     val bytes = blob.getEncoding match {
       case Blob.ENCODING_BASE64 =>
@@ -170,7 +171,8 @@ class GithubService (accessToken: String, switchDao: SwitchDao, cacheOpt: Option
       case Blob.ENCODING_UTF8 =>
         blob.getContent.getBytes
   	}
-    val content = new String(bytes, "utf-8")
+    val content = bytesToReadableString(bytes, fileName)
+//    val content = new String(bytes, "utf-8")
     if(blob == null) None else Some(content)
   }
 

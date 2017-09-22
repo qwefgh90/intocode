@@ -106,6 +106,36 @@ class BpSpec extends FlatSpec with Matchers{
     assert(tree.list.count( _.entry.getType == TYPE_TREE ) >= 10, "A count of nodes must be more than 9")
   }
 
+  "Github api" should "get other tree structure" in {
+	val contentService = new ContentsService(client)
+	val repositoryService = new RepositoryService(client)
+	val commitService = new CommitService(client)
+    val dataService = new DataService(client)
+    val repository = repositoryService.getRepository("qwefgh90", "env")
+    val list = repositoryService.getBranches(repository).asScala
+    val sha = list.find(_.getName=="master").get.getCommit.getSha
+    val rawTree = dataService.getTree(repository, sha, true)
+	val tree = TreeEx(rawTree)
+    tree.syncContents(repository, dataService)
+
+    import org.eclipse.egit.github.core._
+    tree.traverse(new Visitor[TreeEntryEx, Unit]{
+      override var acc: Unit = Unit
+      override def enter(e: TreeEntryEx, stack: List[TreeEntryEx]) = e.entry.getType match {
+        case TreeEntry.TYPE_TREE =>
+          println(s"tree: ${e.level}, ${stack.reverse.map(_.name).mkString("/")}, ${e.name} ")
+
+        case TreeEntry.TYPE_BLOB =>
+          val blob = dataService.getBlob(repository, e.entry.getSha)
+
+          println(s"tree: ${e.level}, ${stack.reverse.map(_.name).mkString("/")}, ${e.name}, ${blob.getEncoding} ")
+      }
+      override def leave(e: TreeEntryEx){
+      }
+    })
+
+  }
+
   "Github api" should "get trees of commits" in {
 	val contentService = new ContentsService(client)
 	val repositoryService = new RepositoryService(client)

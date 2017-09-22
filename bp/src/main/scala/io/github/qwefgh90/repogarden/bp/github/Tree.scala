@@ -34,7 +34,7 @@ trait Tree2 {
    * It provide getContent(), getBytes(), syncContent() method.
    */
   case class TreeEntryEx(seq: Int, level: Int, name: String, entry: TreeEntry) {
-    private var content: String = ""
+//    private var content: String = ""
     private var encoding: String = ""
     private var bytes: Array[Byte] = Array()
     private var sync: Boolean = false
@@ -42,17 +42,19 @@ trait Tree2 {
     private var repository: Repository = null
     private var dataService: DataService = null
 
-    def getContent: Option[String] = {
+/*    def getContent: String = {
       if(!provider)
         throw new IllegalAccessException("The provider does not exists. please call syncContent()")
       if(!sync)
         syncContent()
-      Option(content)
-    }
+      content
+    }*/
 
     def getBytes = {
+      if(!provider)
+        throw new IllegalAccessException("The provider does not exists. please call syncContent()")
       if(!sync)
-        throw new IllegalAccessException("The content does not loaded. please call syncContent()")
+        syncContent()
       bytes
     }
 
@@ -60,7 +62,7 @@ trait Tree2 {
     def hasProvider = provider
 
     private def syncContent(){
-      if(hasProvider){
+      if(hasProvider && !sync){
   	    val sha: String = entry.getSha// this.getSha
   	    val blob = dataService.getBlob(repository, sha)
         blob.getEncoding match {
@@ -70,7 +72,6 @@ trait Tree2 {
             bytes = blob.getContent.getBytes
   	    }
         encoding = blob.getEncoding
-        content = new String(bytes, "utf-8")
         sync = true
       }
     }

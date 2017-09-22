@@ -70,6 +70,7 @@ lazy val bp = (project in file("bp")).
     commonSettings,
     version := "0.1.0-SNAPSHOT",
     name := "bp",
+    libraryDependencies += "io.github.qwefgh90" % "jsearch" % "0.3.0" exclude("org.slf4j", "slf4j-log4j12"),
     libraryDependencies += "com.googlecode.juniversalchardet" % "juniversalchardet" % "1.0.3",
     libraryDependencies += "org.eclipse.aether" % "aether-connector-basic" % "1.1.0",
     libraryDependencies += "org.apache.maven" % "maven-aether-provider" % "3.3.9",
