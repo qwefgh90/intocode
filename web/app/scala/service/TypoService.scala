@@ -93,21 +93,14 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
     })
   }
 
+  private val language = new AmericanEnglish()
+  private val ignoreSubStringList = Range(0x21,0x30).map(_.toChar)
+
   /*
    * Return a typo list, after checking spelling of nodes in treeEx.
    */
   private def checkSpell(parentId: Long, typoRequest: TypoRequest): Future[List[(Typo, List[TypoComponent])]]  = {
     val treeEx = typoRequest.treeEx
-	val langTool = new JLanguageTool(new AmericanEnglish());
-    langTool.getAllRules().asScala.foreach{rule =>
-      if (!rule.isDictionaryBasedSpellingRule()) {
-        langTool.disableRule(rule.getId());
-      }
-      if (rule.isInstanceOf[SpellingCheckRule]) {
-        val wordsToIgnore = List("@author");
-        (rule.asInstanceOf[SpellingCheckRule]).addIgnoreTokens(wordsToIgnore.asJava);
-      }
-    }
     //    langTool.disableCategory(new CategoryId("TYPOGRAPHY"))
     //    langTool.disableCategory(new CategoryId("CAPITALIZATION"))
     //    langTool.disableCategory(new CategoryId("PUNCTUATION"))
@@ -115,6 +108,16 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
     //    langTool.getAllActiveRules().asScala.foreach{r=> Logger.debug(s"rule: ${r.getId} | ${r.getCategory.getId}")}
 
     Future{
+	  val langTool = new JLanguageTool(language);
+      langTool.getAllRules().asScala.foreach{rule =>
+        if (!rule.isDictionaryBasedSpellingRule()) {
+          langTool.disableRule(rule.getId());
+        }
+        if (rule.isInstanceOf[SpellingCheckRule]) {
+          val wordsToIgnore = List("@author");
+          (rule.asInstanceOf[SpellingCheckRule]).addIgnoreTokens(wordsToIgnore.asJava);
+        }
+      }
       val visitor = new io.github.qwefgh90.repogarden.bp.github.Implicits.Visitor[TreeEntryEx, List[(Typo, List[TypoComponent])]]{
         override var acc: List[(Typo, List[TypoComponent])] = List[(Typo, List[TypoComponent])]()
         override def enter(node: TreeEntryEx, stack: List[TreeEntryEx]){
@@ -136,13 +139,24 @@ class TypoService @Inject() (typoDao: TypoDao, @NamedCache("typo-service-cache")
 
             val matches: List[TypoComponent] = comment.map{result =>
               val matches = langTool.check(result.comment)
-              matches.asScala.filter{ruleMatch => ruleMatch.getSuggestedReplacements.size() > 0}.map(ruleMatch => {
-                val c = TypoComponent(None, None, node.entry.getPath, result.startOffset + ruleMatch.getFromPos, result.startOffset + ruleMatch.getToPos, ruleMatch.getLine, ruleMatch.getColumn, Json.toJson(ruleMatch.getSuggestedReplacements.asScala.toList).toString)
+              matches.asScala.filter{ruleMatch => ruleMatch.getSuggestedReplacements.size() > 0}.map(
+                ruleMatch => {
+                  val c = TypoComponent(None, None, node.entry.getPath, result.startOffset + ruleMatch.getFromPos, result.startOffset + ruleMatch.getToPos, ruleMatch.getLine, ruleMatch.getColumn, Json.toJson(ruleMatch.getSuggestedReplacements.asScala.toList).toString)
 
-               Logger.debug(s"(${node.name} | ${result.startOffset} | ${c.from} | ${c.to} | ${result.comment.length} | ${ruleMatch.getRule.getId.toString} | ${ruleMatch.getRule.getCategory.getId.toString} | ${node.entry.getSha})")
-               Logger.debug(s"${content.substring(c.from, c.to)} => ${c.suggestedList.toString}")
-                c
-              }).toList
+                  Logger.debug(s"(${node.name} | ${result.startOffset} | ${c.from} | ${c.to} | ${result.comment.length} | ${ruleMatch.getRule.getId.toString} | ${ruleMatch.getRule.getCategory.getId.toString} | ${node.entry.getSha})")
+                  Logger.debug(s"${content.substring(c.from, c.to)} => ${c.suggestedList.toString}")
+                  c
+                })
+                .filter(c => {
+                  val passed =  content.substring(c.from, c.to).forall(c => {
+                    val i = c.toInt
+                    (i >= 'A'.toInt && i <= 'Z'.toInt) || (i >= 'a'.toInt && i <= 'z'.toInt)
+                  })
+                  if(!passed)
+                    Logger.debug(s"${content.substring(c.from, c.to)} is ignored.")
+                  passed
+                })
+                .toList
             }.foldRight(List[TypoComponent]())((e, acc) => {e ++ acc})
 
             val issueCount = matches.length

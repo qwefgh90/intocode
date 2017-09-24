@@ -6,6 +6,9 @@ import com.typesafe.scalalogging.Logger
 import org.languagetool.JLanguageTool
 import org.languagetool.Language
 import org.languagetool.language.AmericanEnglish
+import org.languagetool.rules._
+import org.languagetool._
+import org.languagetool.rules.spelling.SpellingCheckRule
 import scala.collection.JavaConverters._
 
 class SpellSpec extends FlatSpec with Matchers {
@@ -24,6 +27,15 @@ class SpellSpec extends FlatSpec with Matchers {
       logger.debug(e.toString)
     }
     
+    langTool.getAllRules().asScala.foreach{rule =>
+      if (!rule.isDictionaryBasedSpellingRule()) {
+        langTool.disableRule(rule.getId());
+      }
+      if (rule.isInstanceOf[SpellingCheckRule]) {
+        val wordsToIgnore = List("@author");
+        (rule.asInstanceOf[SpellingCheckRule]).addIgnoreTokens(wordsToIgnore.asJava);
+      }
+    }
     //		langTool.activateDefaultPatternRules();
 
 	val sentence1 = "Hitchhiker's Guide tot he Galaxy"
