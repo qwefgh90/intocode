@@ -71,24 +71,28 @@ class IntegrationSpec extends FlatSpec with Matchers{
     assert(tree.list.filter(e => e.name == "pom.xml").length >= 37, "Apache Spark has pom files more than 37.")
 
     val exResult = loader.execute(dir.resolve("pom.xml"))
-    exResult.log.subscribe(s => logger.debug(s))
+    exResult.log.subscribe(s => logger.debug("execution logs: " + s))
     val MavenResult(value, path) = Await.result(exResult.result, Duration(90, TimeUnit.SECONDS))
     assert(value == MvnResult.Success)
   }
 
   "A victims loader" should "find vulnerables from local pom.xml" in {
     val exResult = loader.execute(Paths.get(getClass.getResource("/vulnerable_pom/pom.xml").toURI()))
+    logger.debug("wait before!")
 
     val MavenResult(value, path) = Await.result(exResult.result, Duration(60, TimeUnit.SECONDS))
-
     assert(value == MvnResult.Success)
     val outputPath = path.get
 
     val tree = DependencyTree(outputPath)
+
     val vulLines = tree.levelLines.collect(
       {case line if victim.scanSingleArtifact(line.artifact.getGroupId, line.artifact.getArtifactId, line.artifact.getVersion).isDefined => line
       }
-    ).toList
+    ).toList    
+    
+    logger.debug("Finished to collect cves.")
+
     vulLines.foreach(l => logger.debug(s"vulerable artifact: ${l.toString}"))
     assert(vulLines.length >= 2, "It should find artifacts equal to or more than 2")
   }

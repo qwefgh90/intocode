@@ -4,6 +4,7 @@ import java.util.Base64
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
+import com.typesafe.scalalogging._
 
 import org.eclipse.egit.github.core.Blob
 import org.eclipse.egit.github.core.RepositoryCommit
@@ -25,12 +26,12 @@ object VictimsLoader {
 }
 
 class VictimsLoader(oauthToken: Option[String]) {
+  private val logger = Logger(classOf[VictimsLoader])
   private lazy val client = {
 	val githubClient = new GitHubClient()
 	if(oauthToken.isDefined){
 	  githubClient.setOAuth2Token(oauthToken.get)
 	}
-	
 	githubClient
   }
   private lazy val contentService = {
@@ -53,8 +54,10 @@ class VictimsLoader(oauthToken: Option[String]) {
   private val victimHomeUrl = "https://github.com/victims/victims-cve-db"
   private val victimDbUrl = "https://github.com/victims/victims-cve-db/tree/master/database/java"
   private val victimBuffer: ListBuffer[Victim] = new ListBuffer[Victim]()
-  private var lastCommit: RepositoryCommit = null
-  
+  lazy val lastCommit: RepositoryCommit = getLastestCommit
+  lazy val lastestCveList = getLastestCveList
+  lazy val lastestCveMap = getLastestCveMap(lastestCveList)
+
   private[victims] def getFirstPageIteratorOfCommits = {
 	val pageIterator = commitService.pageCommits(repository, 100)
 	if(pageIterator.hasNext())
@@ -63,7 +66,53 @@ class VictimsLoader(oauthToken: Option[String]) {
 	  throw new RuntimeException("first of page iterator must exist")
   }
 
-  def getLatestCveList: List[Tuple2[RepositoryContents, Victim]] = {
+  private def getLastestCommit: RepositoryCommit = {
+	val firstPageOfCommits = getFirstPageIteratorOfCommits
+	if(firstPageOfCommits.size() != 0){
+	  firstPageOfCommits.iterator().next()
+    }else
+	  throw new RuntimeException("The iterator of first commits page must have more items than zero")
+  }
+
+
+  private def getLastestCveList: List[Tuple2[RepositoryContents, Victim]] = {
+    val constructor = new Constructor(classOf[Victim]);//Car.class is root
+    val yaml = new Yaml(constructor);
+	val repositoryContentList = contentService.getContents(repository, "database/java", "heads/master", true)
+	repositoryContentList.foreach(repositoryContent => {
+      logger.debug(s"${repositoryContent.getName} is loaded")
+      repositoryContent.syncContent(repository, dataService)
+	})
+    repositoryContentList.map(repositoryContent => {
+	  Tuple2(repositoryContent, yaml.load(repositoryContent.getContent).asInstanceOf[Victim])
+	})
+  }
+  
+  /** Returns a map of groupId + "%" + artifactName to a list of Tuple2[JavaModule, Victim].
+	* It derives VictimsLoader.getLatestCveList.
+	*/
+  private def getLastestCveMap(cveList: List[Tuple2[RepositoryContents, Victim]]): Map[String, List[Tuple2[JavaModule, Victim]]] = {
+	val artifactToCveList = cveList.flatMap(cve => {
+	  cve._2.getAffected.asScala.map(affectedArtifact => {
+	    affectedArtifact.getGroupId + "%" + affectedArtifact.getArtifactId -> (affectedArtifact, cve._2)
+	  })
+	})
+
+	artifactToCveList.foldLeft(Map[String, List[Tuple2[JavaModule, Victim]]]())(
+	  (map: Map[String, List[Tuple2[JavaModule, Victim]]], artifactNameToMainData) => {
+	    if(map.contains(artifactNameToMainData._1)){
+	      val beforeList = map(artifactNameToMainData._1)
+	      map + (artifactNameToMainData._1 -> (artifactNameToMainData._2 :: beforeList))
+	    }else{
+	      map + (artifactNameToMainData._1 -> List(artifactNameToMainData._2))
+        }
+      })
+  }
+
+  case class VulnerablePart(vulnerableVersionList: List[String], relatedJavaModule: JavaModule, relatedCve: Victim)
+  case class VulnerableResult(vulerableList: List[VulnerablePart])
+
+  def getLastestOrDefault = {
 	val firstPageOfCommits = getFirstPageIteratorOfCommits
 	if(firstPageOfCommits.size() != 0){
 	  val lastRemoteCommit = firstPageOfCommits.iterator().next()
@@ -71,29 +120,18 @@ class VictimsLoader(oauthToken: Option[String]) {
       val yaml = new Yaml(constructor);
 	  if(lastCommit == null || lastRemoteCommit.getCommit.getCommitter.getDate
 	    .after(lastCommit.getCommit.getCommitter.getDate)){
-	    lastCommit = lastRemoteCommit
-	    val repositoryContentList = contentService.getContents(repository, "database/java", "heads/master", true)
-	    repositoryContentList.foreach(repositoryContent => {
-          repositoryContent.syncContent(repository, dataService)
-	    })
-	    contentList.clear()
-	    contentList ++= repositoryContentList.map(repositoryContent => {
-	      Tuple2(repositoryContent, yaml.load(repositoryContent.getContent).asInstanceOf[Victim])
-	    })
-	  }
-	  contentList.toList
-	}else
+        VictimsLoader(oauthToken)
+      }else
+        this
+    }else
 	  throw new RuntimeException("The iterator of first commits page must have more items than zero")
   }
-  
-  case class VulnerablePart(vulnerableVersionList: List[String], relatedJavaModule: JavaModule, relatedCve: Victim)
-  case class VulnerableResult(vulerableList: List[VulnerablePart])
   
   /** Return a vulnerable list wrapped by Option if related vulnerables exists.
 	* 
 	*/
   def scanSingleArtifact(groupId: String, artifactId: String, version: String): Option[VulnerableResult] = {
-	val cveMap = getLatestCveMap
+	val cveMap = lastestCveMap//getLastestCveMap
 	val key = groupId + "%" + artifactId
 	if(cveMap.contains(key)){
 	  val affectedArtifactList = cveMap(key)
@@ -144,29 +182,6 @@ class VictimsLoader(oauthToken: Option[String]) {
 	    Option(vulnerableResult)
 	}else
 	  Option.empty
-  }
-  
-  /** Returns a map of groupId + "%" + artifactName to a list of Tuple2[JavaModule, Victim].
-	* It derives VictimsLoader.getLatestCveList.
-	*/
-  def getLatestCveMap: Map[String, List[Tuple2[JavaModule, Victim]]] = {
-	val cveList = getLatestCveList
-	val artifactToCveList = cveList.flatMap(cve => {
-	  cve._2.getAffected.asScala.map(affectedArtifact => {
-	    affectedArtifact.getGroupId + "%" + affectedArtifact.getArtifactId -> (affectedArtifact, cve._2)
-	  })
-	})
-	
-	val artifactToCveListMap = artifactToCveList.foldLeft(Map[String, List[Tuple2[JavaModule, Victim]]]())(
-	  (map: Map[String, List[Tuple2[JavaModule, Victim]]], artifactNameToMainData) => {
-	    if(map.contains(artifactNameToMainData._1)){
-	      val beforeList = map(artifactNameToMainData._1)
-	      map + (artifactNameToMainData._1 -> (artifactNameToMainData._2 :: beforeList))
-	    }else{
-	      map + (artifactNameToMainData._1 -> List(artifactNameToMainData._2))
-        }
-      })
-	artifactToCveListMap
   }
   
   /*	def scanPomFile(is: InputStream): Result = {

@@ -78,6 +78,7 @@ class DependencyLoader (mvnPath: Path, implicit val ec: ExecutionContext) {
           try{
             stream.foreach(str => replay.onNext(str))
           }finally{
+            logger.debug("finally finished!")
             br.close()
             replay.onCompleted()
           }

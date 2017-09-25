@@ -33,13 +33,13 @@ class VictimsSpec extends FlatSpec with Matchers{
 
   "A victims loader" should "load some files having cve" in {
     assert(VictimsLoader(systemTokenOpt).getFirstPageIteratorOfCommits.size() > 0)
-    assert(VictimsLoader(systemTokenOpt).getLatestCveList.size > 20)
+    assert(VictimsLoader(systemTokenOpt).lastestCveList.size > 20)
   }
   
   "A yaml parser for victic model" should "not throw exceptions" in{
     val constructor = new Constructor(classOf[Victim]);//Car.class is root
     val yaml = new Yaml(constructor);
-    VictimsLoader(systemTokenOpt).getLatestCveList.foreach(repositoryContent => {
+    VictimsLoader(systemTokenOpt).lastestCveList.foreach(repositoryContent => {
       val content: String = repositoryContent._1.getContent
       val victim = yaml.load(content).asInstanceOf[Victim]
       logger.debug(s"${repositoryContent._1.getPath} is loaded.")

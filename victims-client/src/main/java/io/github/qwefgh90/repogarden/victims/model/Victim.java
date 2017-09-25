@@ -13,6 +13,7 @@ public class Victim {
 	String title;
 	String description;
 	String cvss_v2;
+    String cvss_v3;
 	List<String> references;
 	List<JavaModule> affected;
 	public String getCve() {
@@ -38,6 +39,12 @@ public class Victim {
 	}
 	public void setCvss_v2(String cvss_v2) {
 		this.cvss_v2 = cvss_v2;
+	}
+	public String getCvss_v3() {
+		return cvss_v3;
+	}
+	public void setCvss_v3(String cvss_v3) {
+		this.cvss_v3 = cvss_v3;
 	}
 	public List<String> getReferences() {
 		return references;

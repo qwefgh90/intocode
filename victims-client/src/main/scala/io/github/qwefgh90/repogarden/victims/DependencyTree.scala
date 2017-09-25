@@ -42,12 +42,16 @@ import scala.collection._
 import scala.annotation.tailrec
 
 object DependencyTree {
+  private val logger = Logger("DependencyTree")
   def apply(mvnOutputPath: Path) = {
-    new DependencyTree(createLevelLineFromMvnOutput(mvnOutputPath))
+    val result = new DependencyTree(createLevelLineFromMvnOutput(mvnOutputPath))
+    logger.debug(s"The dependency tree is constructed for ${mvnOutputPath}")
+    result
   }
 
   def apply(mvnOutput: List[String]) = {
     new DependencyTree(createLevelLineFromMvnOutput(mvnOutput))
+//    logger.debug(s"The dependency tree is constructed for ${mvnOutputPath}")
   }
 
   def createLevelLineFromMvnOutput(list: List[String]): List[LevelLine] = {
