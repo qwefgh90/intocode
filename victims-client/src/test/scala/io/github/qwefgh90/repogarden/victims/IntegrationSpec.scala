@@ -64,8 +64,11 @@ class IntegrationSpec extends FlatSpec with Matchers{
     tree.writeToFileSystem(dir)
     logger.debug(s"spark temp dir: ${dir.toAbsolutePath().toString}")
     tree.foreachEnter((e, list) => { // print pom.xml
-      if(e.name == "pom.xml")
+      if(e.name == "pom.xml"){
+        logger.debug(e.level.toString)
         logger.debug(list.map(e => e.name).reverse.mkString("/") + "/" + e.name)
+      }
+
     })
 
     assert(tree.list.filter(e => e.name == "pom.xml").length >= 37, "Apache Spark has pom files more than 37.")

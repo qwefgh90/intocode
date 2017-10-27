@@ -128,7 +128,7 @@ object Implicits extends RepositoryExtension {
       "htmlUrl" -> repo.getHtmlUrl
     )
   }
-
+/*
   implicit val cveWritesToBrowser = new Writes[Cve] {
     def writes(cve: Cve) = Json.obj(
       "cve" -> cve.cve,
@@ -137,7 +137,7 @@ object Implicits extends RepositoryExtension {
       "references" -> cve.references
     )
   }
-
+ */
   implicit val typoToBrowser = new OWrites[Typo] {
     def writes(typo: Typo) = {
       Json.obj(

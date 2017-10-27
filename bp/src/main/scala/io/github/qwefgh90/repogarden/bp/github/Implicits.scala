@@ -15,7 +15,7 @@ import java.nio.file.StandardOpenOption._
 import java.io._
 import com.typesafe.scalalogging._
 
-object Implicits extends Tree2 { 
+object Implicits extends Tree { 
 
   private val logger = Logger(Implicits.getClass)
   

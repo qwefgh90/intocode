@@ -16,8 +16,8 @@ import java.io._
 import com.typesafe.scalalogging._
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
 
-trait Tree2 {
-  private val logger = Logger(classOf[Tree2])
+trait Tree {
+  private val logger = Logger(classOf[Tree])
 
   val TYPE_TREE = TreeEntry.TYPE_TREE
   val TYPE_BLOB = TreeEntry.TYPE_BLOB
@@ -32,6 +32,7 @@ trait Tree2 {
    * A sub class of org.eclipse.egit.github.core.TreeEntry
    * Since TreeEntry class does not provide a content of blob,
    * It provide getContent(), getBytes(), syncContent() method.
+   * A level starts from zero.
    */
   case class TreeEntryEx(seq: Int, level: Int, name: String, entry: TreeEntry) {
 //    private var content: String = ""
@@ -41,14 +42,6 @@ trait Tree2 {
     private var provider: Boolean = false
     private var repository: Repository = null
     private var dataService: DataService = null
-
-/*    def getContent: String = {
-      if(!provider)
-        throw new IllegalAccessException("The provider does not exists. please call syncContent()")
-      if(!sync)
-        syncContent()
-      content
-    }*/
 
     def getBytes = {
       if(!provider)

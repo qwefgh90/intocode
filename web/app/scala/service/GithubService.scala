@@ -7,7 +7,6 @@ import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import io.github.qwefgh90.repogarden.bp.github.Implicits._
 import io.github.qwefgh90.repogarden.bp.Boilerplate._
-import javax.inject._
 import org.eclipse.egit.github.core._
 import org.eclipse.egit.github.core.service._
 import org.eclipse.egit.github.core.client.GitHubClient

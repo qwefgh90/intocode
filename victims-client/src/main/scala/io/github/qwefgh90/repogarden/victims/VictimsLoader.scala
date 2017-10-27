@@ -25,6 +25,9 @@ object VictimsLoader {
   }
 }
 
+case class VulnerablePart(vulnerableVersionList: List[String], relatedJavaModule: JavaModule, relatedCve: Victim)
+case class VulnerableResult(vulerableList: List[VulnerablePart])
+
 class VictimsLoader(oauthToken: Option[String]) {
   private val logger = Logger(classOf[VictimsLoader])
   private lazy val client = {
@@ -108,9 +111,6 @@ class VictimsLoader(oauthToken: Option[String]) {
         }
       })
   }
-
-  case class VulnerablePart(vulnerableVersionList: List[String], relatedJavaModule: JavaModule, relatedCve: Victim)
-  case class VulnerableResult(vulerableList: List[VulnerablePart])
 
   def getLastestOrDefault = {
 	val firstPageOfCommits = getFirstPageIteratorOfCommits
